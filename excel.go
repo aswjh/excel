@@ -34,75 +34,6 @@ type Sheet struct {
 //
 type VARIANT ole.VARIANT
 
-//convert MS VARIANT to string
-func (va VARIANT) ToString() (ret string) {
-    vt := va.VT
-    switch {
-        case vt==2:
-            v2:=(*int16)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatInt(int64(*v2), 10)
-        case vt==3:
-            v3:=(*int32)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatInt(int64(*v3), 10)
-        case vt==4:
-            v4:=(*float32)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatFloat(float64(*v4), 'f', 2, 64)
-        case vt==5:
-            v5:=(*float64)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatFloat(*v5, 'f', 2, 64)
-        case vt==8:       //string
-            v8:=(**uint16)(unsafe.Pointer(&va.Val))
-            ret = ole.UTF16PtrToString(*v8)
-        case vt==11:
-            v11:=(*bool)(unsafe.Pointer(&va.Val))
-            if *v11 {
-                ret = "TRUE"
-            } else {
-                ret = "FALSE"
-            }
-        case vt==16:
-            v16:=(*int8)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatInt(int64(*v16), 10)
-        case vt==17:
-            v17:=(*uint8)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatUint(uint64(*v17), 10)
-        case vt==18:
-            v18:=(*uint16)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatUint(uint64(*v18), 10)
-        case vt==19:
-            v19:=(*uint32)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatUint(uint64(*v19), 10)
-        case vt==20:
-            v20:=(*int64)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatInt(int64(*v20), 10)
-        case vt==21:
-            v21:=(*uint64)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatUint(uint64(*v21), 10)
-    }
-    return
-}
-
-//
-func (option Option) Fields() (ret []string) {
-    fields := reflect.Indirect(reflect.ValueOf(option)).Type()
-    num := fields.NumField()
-    for i:=0; i<num; i++ {
-        ret = append(ret, fields.Field(i).Name)
-    }
-    return
-}
-
-//
-func Except(exit int, info string) {
-    r := recover()
-    if r != nil {
-        fmt.Println("Excel Except:", info, r)
-        if exit>0 {
-            os.Exit(exit)
-        }
-    }
-}
-
 //
 func Init(options... Option) (mso *MSO) {
     ole.CoInitialize(0)
@@ -319,6 +250,75 @@ func (sheet Sheet) Cells(r int, c int, val...interface{}) (ret string) {
         }
     }
     return
+}
+
+//
+func (option Option) Fields() (ret []string) {
+    fields := reflect.Indirect(reflect.ValueOf(option)).Type()
+    num := fields.NumField()
+    for i:=0; i<num; i++ {
+        ret = append(ret, fields.Field(i).Name)
+    }
+    return
+}
+
+//convert MS VARIANT to string
+func (va VARIANT) ToString() (ret string) {
+    vt := va.VT
+    switch {
+        case vt==2:
+            v2:=(*int16)(unsafe.Pointer(&va.Val))
+            ret = strconv.FormatInt(int64(*v2), 10)
+        case vt==3:
+            v3:=(*int32)(unsafe.Pointer(&va.Val))
+            ret = strconv.FormatInt(int64(*v3), 10)
+        case vt==4:
+            v4:=(*float32)(unsafe.Pointer(&va.Val))
+            ret = strconv.FormatFloat(float64(*v4), 'f', 2, 64)
+        case vt==5:
+            v5:=(*float64)(unsafe.Pointer(&va.Val))
+            ret = strconv.FormatFloat(*v5, 'f', 2, 64)
+        case vt==8:       //string
+            v8:=(**uint16)(unsafe.Pointer(&va.Val))
+            ret = ole.UTF16PtrToString(*v8)
+        case vt==11:
+            v11:=(*bool)(unsafe.Pointer(&va.Val))
+            if *v11 {
+                ret = "TRUE"
+            } else {
+                ret = "FALSE"
+            }
+        case vt==16:
+            v16:=(*int8)(unsafe.Pointer(&va.Val))
+            ret = strconv.FormatInt(int64(*v16), 10)
+        case vt==17:
+            v17:=(*uint8)(unsafe.Pointer(&va.Val))
+            ret = strconv.FormatUint(uint64(*v17), 10)
+        case vt==18:
+            v18:=(*uint16)(unsafe.Pointer(&va.Val))
+            ret = strconv.FormatUint(uint64(*v18), 10)
+        case vt==19:
+            v19:=(*uint32)(unsafe.Pointer(&va.Val))
+            ret = strconv.FormatUint(uint64(*v19), 10)
+        case vt==20:
+            v20:=(*int64)(unsafe.Pointer(&va.Val))
+            ret = strconv.FormatInt(int64(*v20), 10)
+        case vt==21:
+            v21:=(*uint64)(unsafe.Pointer(&va.Val))
+            ret = strconv.FormatUint(uint64(*v21), 10)
+    }
+    return
+}
+
+//
+func Except(exit int, info string) {
+    r := recover()
+    if r != nil {
+        fmt.Println("Excel Except:", info, r)
+        if exit>0 {
+            os.Exit(exit)
+        }
+    }
 }
 
 

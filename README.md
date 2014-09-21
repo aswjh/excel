@@ -1,6 +1,6 @@
 ﻿#excel for golang
 
-Read and write excel for golang.
+read and write excel for golang.
 
 go语言读写excel文件.
 
