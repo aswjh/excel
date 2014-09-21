@@ -36,46 +36,45 @@ type VARIANT ole.VARIANT
 
 //convert MS VARIANT to string
 func (va VARIANT) ToString() (ret string) {
-    vt := va.VT
-    switch {
-        case vt==2:
+    switch va.VT {
+        case 2:
             v2:=(*int16)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatInt(int64(*v2), 10)
-        case vt==3:
+        case 3:
             v3:=(*int32)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatInt(int64(*v3), 10)
-        case vt==4:
+        case 4:
             v4:=(*float32)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatFloat(float64(*v4), 'f', 2, 64)
-        case vt==5:
+        case 5:
             v5:=(*float64)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatFloat(*v5, 'f', 2, 64)
-        case vt==8:       //string
+        case 8:       //string
             v8:=(**uint16)(unsafe.Pointer(&va.Val))
             ret = ole.UTF16PtrToString(*v8)
-        case vt==11:
+        case 11:
             v11:=(*bool)(unsafe.Pointer(&va.Val))
             if *v11 {
                 ret = "TRUE"
             } else {
                 ret = "FALSE"
             }
-        case vt==16:
+        case 16:
             v16:=(*int8)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatInt(int64(*v16), 10)
-        case vt==17:
+        case 17:
             v17:=(*uint8)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatUint(uint64(*v17), 10)
-        case vt==18:
+        case 18:
             v18:=(*uint16)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatUint(uint64(*v18), 10)
-        case vt==19:
+        case 19:
             v19:=(*uint32)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatUint(uint64(*v19), 10)
-        case vt==20:
+        case 20:
             v20:=(*int64)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatInt(int64(*v20), 10)
-        case vt==21:
+        case 21:
             v21:=(*uint64)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatUint(uint64(*v21), 10)
     }
@@ -175,12 +174,12 @@ func (mso *MSO) Quit() {
 }
 
 //
-func (mso *MSO) Select(str string, id interface {}) (ret *ole.IDispatch) {
-    defer Except(0, "mso.Select")
+func (mso *MSO) Pick(workx string, id interface {}) (ret *ole.IDispatch) {
+    defer Except(0, "mso.Pick")
     if id_int, ok := id.(int); ok {
-        ret = oleutil.MustGetProperty(mso.IdExcel, str, id_int).ToIDispatch()
+        ret = oleutil.MustGetProperty(mso.IdExcel, workx, id_int).ToIDispatch()
     } else if id_str, ok := id.(string); ok {
-        ret = oleutil.MustGetProperty(mso.IdExcel, str, id_str).ToIDispatch()
+        ret = oleutil.MustGetProperty(mso.IdExcel, workx, id_str).ToIDispatch()
     }
     return
 }
@@ -210,8 +209,10 @@ func (mso *MSO) WorkBookOpen(full string) (*ole.IDispatch) {
 }
 
 //
-func (mso *MSO) WorkBookSelect(id interface {}) (*ole.IDispatch) {
-    return mso.Select("WorkBooks", id)
+func (mso *MSO) WorkBookActivate(id interface {}) (wb *ole.IDispatch) {
+    wb = mso.Pick("WorkBooks", id)
+    oleutil.MustCallMethod(wb, "Activate")
+    return
 }
 
 //
@@ -238,7 +239,7 @@ func (mso *MSO) Sheets() (sheets []Sheet) {
 
 //
 func (mso *MSO) Sheet(id interface {}) (Sheet) {
-    return Sheet{mso.Select("WorkSheets", id)}
+    return Sheet{mso.Pick("WorkSheets", id)}
 }
 
 //
@@ -276,6 +277,38 @@ func (sheet Sheet) Name(args... string) (name string) {
     return
 }
 
+//
+func (sheet Sheet) Cells(r int, c int, vals...interface{}) (ret string) {
+    defer Except(0, "Cells")
+    cell := oleutil.MustGetProperty(sheet.IDisp, "Range", Cell2r(r, c)).ToIDispatch()
+    defer cell.Release()
+    if vals == nil {
+        //ret = oleutil.MustGetProperty(cell, "Value").ToString()
+        ret = VARIANT(*oleutil.MustGetProperty(cell, "Value")).ToString()
+    } else {
+        val := vals[0]
+        switch val.(type) {
+            case string:
+                oleutil.PutProperty(cell, "Value", val.(string))
+            case int:
+                oleutil.PutProperty(cell, "Value", val.(int))    //strconv.Itoa(val.(int)))
+            case int32:
+                oleutil.PutProperty(cell, "Value", val.(int32))    //, strconv.FormatInt(int64(val.(int32)), 0))
+            case int64:
+                oleutil.PutProperty(cell, "Value", val.(int64))    //, strconv.FormatInt(val.(int64), 0))
+            case float32:
+                oleutil.PutProperty(cell, "Value", val.(float32))    //, val.(float32))
+            case float64:
+                oleutil.PutProperty(cell, "Value", val.(float64))    //, val.(float64))
+            case bool:
+                oleutil.PutProperty(cell, "Value", val.(bool))    //, val.(bool))
+           default:
+                println("Cell not set: ", r, c)
+        }
+    }
+    return
+}
+
 //(5,27) convert to "AA5"  // xp+office2003 cant use cell(1,1)
 func Cell2r(x, y int) string {
     s := ""
@@ -289,35 +322,6 @@ func Cell2r(x, y int) string {
         y = a
     }
     return s+strconv.Itoa(x)
-}
-
-//
-func (sheet Sheet) Cells(r int, c int, val...interface{}) (ret string) {
-    defer Except(0, "Cells")
-    cell := oleutil.MustGetProperty(sheet.IDisp, "Range", Cell2r(r, c)).ToIDispatch()
-    defer cell.Release()
-    if val == nil {
-        //ret = oleutil.MustGetProperty(cell, "Value").ToString()
-        ret = VARIANT(*oleutil.MustGetProperty(cell, "Value")).ToString()
-    } else {
-        _val := val[0]
-        if val_str, ok := _val.(string); ok {
-            oleutil.PutProperty(cell, "Value", val_str)
-        } else if val_int, ok := _val.(int); ok {
-            oleutil.PutProperty(cell, "Value", val_int)    //strconv.Itoa(val_int))
-        } else if val_int32, ok := _val.(int32); ok {
-            oleutil.PutProperty(cell, "Value", val_int32)    //, strconv.FormatInt(int64(val_int32), 0))
-        } else if val_int64, ok := _val.(int64); ok {
-            oleutil.PutProperty(cell, "Value", val_int64)    //, strconv.FormatInt(val_int64, 0))
-        } else if val_float32, ok := _val.(float32); ok {
-            oleutil.PutProperty(cell, "Value", val_float32)    //, val_float32)
-        } else if val_float64, ok := _val.(float64); ok {
-            oleutil.PutProperty(cell, "Value", val_float64)    //, val_float64)
-        } else {
-            println("Cell not set: ", r, c)
-        }
-    }
-    return
 }
 
 //
