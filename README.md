@@ -1,17 +1,18 @@
 ﻿#excel for golang
 
-Read and write EXCEL for golang.
-go语言读写EXCEL文件.
+Read and write excel for golang.
 
-#Dependency
+go语言读写excel文件.
+
+#dependency
 
 [github.com/mattn/go-ole][ole]
 
-#Install
+#install
 
 go get github.com/aswjh/excel
 
-#Example
+#example
 ``` go
 package main
 
@@ -42,7 +43,7 @@ func main() {
 
 ```
 
-#License
+#license
 
 The [BSD 3-Clause license][bsd]
 
