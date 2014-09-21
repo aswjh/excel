@@ -141,6 +141,11 @@ func (mso *MSO) WorkBookOpen(full string) (*ole.IDispatch) {
 }
 
 //
+func (mso *MSO) WorkBookSelect(id interface {}) (*ole.IDispatch) {
+    return mso.Select("WorkBooks", id)
+}
+
+//
 func (mso *MSO) ActiveWorkBook() (*ole.IDispatch) {
     return oleutil.MustGetProperty(mso.IdExcel, "ActiveWorkBook").ToIDispatch()
 }
@@ -163,14 +168,8 @@ func (mso *MSO) Sheets() (sheets []Sheet) {
 }
 
 //
-func (mso *MSO) Sheet(id interface {}) (sheet Sheet) {
-    defer Except(0, "Sheet")
-    if id_int, ok := id.(int); ok {
-        sheet = Sheet{oleutil.MustGetProperty(mso.IdExcel, "WorkSheets", id_int).ToIDispatch()}
-    } else if id_str, ok := id.(string); ok {
-        sheet = Sheet{oleutil.MustGetProperty(mso.IdExcel, "WorkSheets", id_str).ToIDispatch()}
-    }
-    return
+func (mso *MSO) Sheet(id interface {}) (Sheet) {
+    return Sheet{mso.Select("WorkSheets", id)}
 }
 
 //
@@ -192,6 +191,16 @@ func (mso *MSO) SheetSelect(id interface {}) (sheet Sheet) {
     return
 }
 
+//
+func (mso *MSO) Select(str string, id interface {}) (ret *ole.IDispatch) {
+    defer Except(0, "mso.Select")
+    if id_int, ok := id.(int); ok {
+        ret = oleutil.MustGetProperty(mso.IdExcel, str, id_int).ToIDispatch()
+    } else if id_str, ok := id.(string); ok {
+        ret = oleutil.MustGetProperty(mso.IdExcel, str, id_str).ToIDispatch()
+    }
+    return
+}
 //
 func (sheet Sheet) Select() {
     oleutil.MustCallMethod(sheet.IDisp, "Select")
