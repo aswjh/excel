@@ -205,11 +205,13 @@ func (mso *MSO) WorkBookAdd() (*ole.IDispatch) {
 
 //
 func (mso *MSO) WorkBookOpen(full string) (*ole.IDispatch) {
+    defer Except(0, "WorkBookOpen")
     return oleutil.MustCallMethod(mso.IdWorkBooks, "open", full).ToIDispatch()
 }
 
 //
 func (mso *MSO) WorkBookActivate(id interface {}) (wb *ole.IDispatch) {
+    defer Except(0, "WorkBookActivate")
     wb = mso.Pick("WorkBooks", id)
     oleutil.MustCallMethod(wb, "Activate")
     return
