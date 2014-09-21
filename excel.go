@@ -12,7 +12,7 @@ import (
 )
 
 type Option struct {
-    Visible                        bool
+    Visible                      bool
     DisplayAlerts                bool
     ScreenUpdating               bool
 }
@@ -20,9 +20,9 @@ type Option struct {
 type MSO struct {
     Option
     IuApp                      *ole.IUnknown
-    IdExcel                     *ole.IDispatch
-    IdWorkBooks                 *ole.IDispatch
-    Version                     float64
+    IdExcel                    *ole.IDispatch
+    IdWorkBooks                *ole.IDispatch
+    Version                   float64
     FILEFORMAT          map[string]int
     FILEFORMAT11        map[string]string
 }
