@@ -12,19 +12,19 @@ import (
 )
 
 type Option struct {
-    Visible                   bool
-    DisplayAlerts          bool
-    ScreenUpdating     bool
+    Visible                        bool
+    DisplayAlerts                bool
+    ScreenUpdating               bool
 }
 
 type MSO struct {
     Option
-    IuApp                  *ole.IUnknown
-    IdExcel                *ole.IDispatch
-    IdWorkBooks        *ole.IDispatch
-    Version                  float64
+    IuApp                      *ole.IUnknown
+    IdExcel                     *ole.IDispatch
+    IdWorkBooks                 *ole.IDispatch
+    Version                     float64
     FILEFORMAT          map[string]int
-    FILEFORMAT11      map[string]string
+    FILEFORMAT11        map[string]string
 }
 
 type Sheet struct {
