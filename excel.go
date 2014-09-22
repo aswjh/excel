@@ -164,8 +164,7 @@ func (mso *MSO) SaveAs(args... interface{}) {
 
 //
 func (mso *MSO) Quit() {
-    defer Except(0, "Quit")
-    defer ole.CoUninitialize()
+    defer Except(0, "Quit", ole.CoUninitialize)
     oleutil.MustCallMethod(mso.IdWorkBooks, "Close")
     oleutil.MustCallMethod(mso.IdExcel, "Quit")
     mso.IdWorkBooks.Release()
@@ -375,15 +374,22 @@ func Cell2r(x, y int) (ret string) {
 }
 
 //
-func Except(exit int, info string) {
+func Except(exit int, info string, functions... func()) {
     r := recover()
     if r != nil {
-        fmt.Println("Excel Except:", info, r)
+        println("Excel Except:", info, r)
         if exit>0 {
             os.Exit(exit)
         }
     }
+    for _, funcx := range functions {
+        func() {
+            defer recover()
+            funcx()
+        }()
+    }
 }
+
 
 
 
