@@ -138,7 +138,7 @@ func Init(options... Option) (mso *MSO) {
 
 //
 func New(options... Option) (mso *MSO) {
-    defer Except(1, "New")
+    defer Except(0, "New")
     mso = Init(options...)
     mso.WorkBookAdd()
     return
@@ -146,7 +146,7 @@ func New(options... Option) (mso *MSO) {
 
 //
 func Open(full string, options... Option) (mso *MSO) {
-    defer Except(1, "Open")
+    defer Except(0, "Open")
     mso = Init(options...)
     mso.WorkBookOpen(full)
     return
