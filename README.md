@@ -25,20 +25,16 @@ func main() {
 	option := excel.Option{Visible: true, ScreenUpdating: true, DisplayAlerts: true}
 	xl := excel.New(option)      //xl := excel.Open("test_excel.xls", option)
 	defer xl.Quit()
-	println("test0: ", xl.Version)
 
-	sheet := xl.Sheet(1)    //xl.Sheet("sheet1")
-
+	sheet := xl.Sheet(1)       //xl.Sheet("sheet1")
 	for i:=2; i<=6; i++ {
-		sheet.Cells(i, i, 1000+i)
+		sheet.Cells(2, i, 1000+i)
 	}
 
-	println("test1: ", sheet.Cells(1, 1), sheet.Cells(2, 2), sheet.Cells(3, 3))
+	println("cell strings: ", sheet.Cells(2, 1), sheet.Cells(2, 2), sheet.Cells(2, 3))
 	time.Sleep(3000000000)
 
 	xl.SaveAs("test_excel.xls")
-	println("test2: finished")
-
 }
 
 ```
