@@ -289,6 +289,13 @@ func (wbs WorkBooks) SaveAs(args... interface{}) {
 }
 
 //
+func (wbs WorkBooks) Close() {
+    for _, wb := range wbs {
+        wb.Close()
+    }
+}
+
+//
 func (wb WorkBook) Activate() {
     defer Except(0, "WorkBook.Activate")
     oleutil.MustCallMethod(wb.Idisp, "Activate")
@@ -309,6 +316,12 @@ func (wb WorkBook) Save() {
 func (wb WorkBook) SaveAs(args... interface{}) {
     defer Except(0, "WorkBook.SaveAs")
     oleutil.MustCallMethod(wb.Idisp, "SaveAs", args...)
+}
+
+//
+func (wb WorkBook) Close() {
+    defer Except(0, "WorkBook.Close")
+    oleutil.MustCallMethod(wb.Idisp, "Close")
 }
 
 //
