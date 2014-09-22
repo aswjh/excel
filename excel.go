@@ -376,17 +376,17 @@ func Cell2r(x, y int) (ret string) {
 //
 func Except(exit int, info string, functions... func()) {
     r := recover()
-    if r != nil {
-        fmt.Println("Except:", info, r)
-        if exit>0 {
-            os.Exit(exit)
-        }
-    }
     for _, funcx := range functions {
         func() {
             defer recover()
             funcx()
         }()
+    }
+    if r != nil {
+        fmt.Println("Except:", info, r)
+        if exit>0 {
+            os.Exit(exit)
+        }
     }
 }
 
