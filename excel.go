@@ -4,6 +4,7 @@ import (
     "os"
     "strconv"
     "strings"
+    "path/filepath"
     "unsafe"
     "reflect"
     "fmt"
@@ -27,12 +28,20 @@ type MSO struct {
     FILEFORMAT11        map[string]string
 }
 
+type WorkBook struct {
+    Idisp *ole.IDispatch
+}
+
+type WorkBooks []WorkBook
+
 type Sheet struct {
-    IDisp *ole.IDispatch
+    Idisp *ole.IDispatch
 }
 
 //
-type VARIANT ole.VARIANT
+type VARIANT struct {
+    *ole.VARIANT
+}
 
 //convert MS VARIANT to string
 func (va VARIANT) ToString() (ret string) {
@@ -92,12 +101,16 @@ func (option Option) Fields() (ret []string) {
 }
 
 //
-func (mso *MSO) SetOption(option Option) {
+func (mso *MSO) SetOption(option Option, args... int) {
     defer Except(0, "SetOption")
-    elems := reflect.ValueOf(option)                      //.Elem()
+    opts, curs := reflect.ValueOf(&mso.Option).Elem(), reflect.ValueOf(option)
     for _, key := range option.Fields() {
-        val := elems.FieldByName(key).Bool()            //SetBool(true)
-        oleutil.PutProperty(mso.IdExcel, key, val)
+        opt, cur := opts.FieldByName(key), curs.FieldByName(key)
+        optv, curv := opt.Bool(), cur.Bool()
+        if (args != nil && args[0] > 0) || optv != curv {
+            opt.SetBool(curv)
+            oleutil.PutProperty(mso.IdExcel, key, curv)
+        }
     }
 }
 
@@ -114,7 +127,7 @@ func Init(options... Option) (mso *MSO) {
         option = options[0]
     }
     mso = &MSO{Option:option, IuApp:app, IdExcel:excel, IdWorkBooks:wbs, Version:ver}
-    mso.SetOption(option)
+    mso.SetOption(option, 1)
 
     //XlFileFormat Enumeration: http://msdn.microsoft.com/en-us/library/office/ff198017%28v=office.15%29.aspx
     mso.FILEFORMAT = map[string]int {"txt":-4158, "csv":6, "html":44, "xlsx":51, "xls":56}
@@ -140,26 +153,12 @@ func Open(full string, options... Option) (mso *MSO) {
 
 //
 func (mso *MSO) Save() {
-    defer Except(0, "Save")
-    for _, workbook := range mso.WorkBooks() {
-        oleutil.MustCallMethod(workbook, "Save")
-    }
+    mso.WorkBooks().Save()
 }
 
 //
-func (mso *MSO) SaveAs(full string, args...string) {
-    defer Except(0, "SaveAs")
-    if true || mso.Version<=11.0 || args == nil {
-        for _, workbook := range mso.WorkBooks() {
-            oleutil.MustCallMethod(workbook, "SaveAs", full)
-        }
-    } else {
-        val := args[0]
-        ff := mso.FILEFORMAT[strings.ToLower(val)]
-        for _, workbook := range mso.WorkBooks() {
-            oleutil.MustCallMethod(workbook, "SaveAs", full, ff)
-        }
-    }
+func (mso *MSO) SaveAs(full string, args... interface{}) {
+    mso.WorkBooks().SaveAs(full, args...)
 }
 
 //
@@ -190,36 +189,36 @@ func (mso *MSO) WorkBooksCount() (int) {
 }
 
 //
-func (mso *MSO) WorkBooks() (wbs []*ole.IDispatch) {
+func (mso *MSO) WorkBooks() (wbs WorkBooks) {
     num := mso.WorkBooksCount()
     for i:=1; i<=num; i++ {
-        wbs = append(wbs, oleutil.MustGetProperty(mso.IdExcel, "WorkBooks", num).ToIDispatch())
+        wbs = append(wbs, WorkBook{oleutil.MustGetProperty(mso.IdExcel, "WorkBooks", i).ToIDispatch()})
     }
     return
 }
 
 //
-func (mso *MSO) WorkBookAdd() (*ole.IDispatch) {
-    return oleutil.MustCallMethod(mso.IdWorkBooks, "Add").ToIDispatch()
+func (mso *MSO) WorkBookAdd() (WorkBook) {
+    return WorkBook{oleutil.MustCallMethod(mso.IdWorkBooks, "Add").ToIDispatch()}
 }
 
 //
-func (mso *MSO) WorkBookOpen(full string) (*ole.IDispatch) {
+func (mso *MSO) WorkBookOpen(full string) (WorkBook) {
     defer Except(0, "WorkBookOpen")
-    return oleutil.MustCallMethod(mso.IdWorkBooks, "open", full).ToIDispatch()
+    return WorkBook{oleutil.MustCallMethod(mso.IdWorkBooks, "open", full).ToIDispatch()}
 }
 
 //
-func (mso *MSO) WorkBookActivate(id interface {}) (wb *ole.IDispatch) {
+func (mso *MSO) WorkBookActivate(id interface {}) (wb WorkBook) {
     defer Except(0, "WorkBookActivate")
-    wb = mso.Pick("WorkBooks", id)
-    oleutil.MustCallMethod(wb, "Activate")
+    wb = WorkBook{mso.Pick("WorkBooks", id)}
+    wb.Activate()
     return
 }
 
 //
-func (mso *MSO) ActiveWorkBook() (*ole.IDispatch) {
-    return oleutil.MustGetProperty(mso.IdExcel, "ActiveWorkBook").ToIDispatch()
+func (mso *MSO) ActiveWorkBook() (WorkBook) {
+    return WorkBook{oleutil.MustGetProperty(mso.IdExcel, "ActiveWorkBook").ToIDispatch()}
 }
 
 //
@@ -264,17 +263,69 @@ func (mso *MSO) SheetSelect(id interface {}) (sheet Sheet) {
 }
 
 //
+func (wbs WorkBooks) Save() {
+    for _, wb := range wbs {
+        wb.Save()
+    }
+}
+
+//
+func (wbs WorkBooks) SaveAs(full string, args... interface{}) {
+    num := len(wbs)
+    if num<2 {
+        for _, wb := range wbs {
+            wb.SaveAs(full)
+        }
+    }  else {
+        ext := filepath.Ext(full)
+        for i, wb := range wbs {
+            wb.SaveAs(strings.Replace(full, ext, "_"+strconv.Itoa(i)+ext, 1))
+        }
+
+    }
+}
+
+//
+func (wb WorkBook) Activate() {
+    defer Except(0, "WorkBook.Activate")
+    oleutil.MustCallMethod(wb.Idisp, "Activate")
+}
+
+//
+func (wb WorkBook) Name() (string) {
+    return oleutil.MustGetProperty(wb.Idisp, "Name").ToString()
+}
+
+//
+func (wb WorkBook) Save() {
+    defer Except(0, "WorkBook.Save")
+    oleutil.MustCallMethod(wb.Idisp, "Save")
+}
+
+//
+func (wb WorkBook) SaveAs(args... interface{}) {
+    defer Except(0, "WorkBook.SaveAs")
+    oleutil.MustCallMethod(wb.Idisp, "SaveAs", args...)
+}
+
+//
 func (sheet Sheet) Select() {
-    oleutil.MustCallMethod(sheet.IDisp, "Select")
+    defer Except(0, "Sheet.Select")
+    oleutil.MustCallMethod(sheet.Idisp, "Select")
+}
+
+//
+func (sheet Sheet) Delete() {
+    oleutil.MustCallMethod(sheet.Idisp, "Delete")
 }
 
 //
 func (sheet Sheet) Name(args... string) (name string) {
     if args == nil {
-        name = oleutil.MustGetProperty(sheet.IDisp, "Name").ToString()
+        name = oleutil.MustGetProperty(sheet.Idisp, "Name").ToString()
     } else {
         name = args[0]
-        oleutil.MustPutProperty(sheet.IDisp, "Name", name)
+        oleutil.MustPutProperty(sheet.Idisp, "Name", name)
     }
     return
 }
@@ -282,48 +333,29 @@ func (sheet Sheet) Name(args... string) (name string) {
 //
 func (sheet Sheet) Cells(r int, c int, vals...interface{}) (ret string) {
     defer Except(0, "Cells")
-    cell := oleutil.MustGetProperty(sheet.IDisp, "Range", Cell2r(r, c)).ToIDispatch()
+    cell := oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()
     defer cell.Release()
     if vals == nil {
         //ret = oleutil.MustGetProperty(cell, "Value").ToString()
-        ret = VARIANT(*oleutil.MustGetProperty(cell, "Value")).ToString()
+        ret = VARIANT{oleutil.MustGetProperty(cell, "Value")}.ToString()
     } else {
-        val := vals[0]
-        switch val.(type) {
-            case string:
-                oleutil.PutProperty(cell, "Value", val.(string))
-            case int:
-                oleutil.PutProperty(cell, "Value", val.(int))    //strconv.Itoa(val.(int)))
-            case int32:
-                oleutil.PutProperty(cell, "Value", val.(int32))    //, strconv.FormatInt(int64(val.(int32)), 0))
-            case int64:
-                oleutil.PutProperty(cell, "Value", val.(int64))    //, strconv.FormatInt(val.(int64), 0))
-            case float32:
-                oleutil.PutProperty(cell, "Value", val.(float32))    //, val.(float32))
-            case float64:
-                oleutil.PutProperty(cell, "Value", val.(float64))    //, val.(float64))
-            case bool:
-                oleutil.PutProperty(cell, "Value", val.(bool))    //, val.(bool))
-           default:
-                println("Cell not set: ", r, c)
-        }
+        oleutil.PutProperty(cell, "Value", vals[0])
     }
     return
 }
 
 //(5,27) convert to "AA5"  // xp+office2003 cant use cell(1,1)
-func Cell2r(x, y int) string {
-    s := ""
+func Cell2r(x, y int) (ret string) {
     for y>0 {
         a, b := int(y/26), y%26
         if b==0 {
             a-=1
             b=26
         }
-        s = string(rune(b+64))+s
+        ret = string(rune(b+64))+ret
         y = a
     }
-    return s+strconv.Itoa(x)
+    return ret+strconv.Itoa(x)
 }
 
 //
@@ -336,6 +368,7 @@ func Except(exit int, info string) {
         }
     }
 }
+
 
 
 
