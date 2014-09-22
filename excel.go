@@ -30,6 +30,7 @@ type MSO struct {
 
 type WorkBook struct {
     Idisp *ole.IDispatch
+    *MSO
 }
 
 type WorkBooks []WorkBook
@@ -157,8 +158,8 @@ func (mso *MSO) Save() {
 }
 
 //
-func (mso *MSO) SaveAs(full string, args... interface{}) {
-    mso.WorkBooks().SaveAs(full, args...)
+func (mso *MSO) SaveAs(args... interface{}) {
+    mso.WorkBooks().SaveAs(args...)
 }
 
 //
@@ -192,33 +193,33 @@ func (mso *MSO) WorkBooksCount() (int) {
 func (mso *MSO) WorkBooks() (wbs WorkBooks) {
     num := mso.WorkBooksCount()
     for i:=1; i<=num; i++ {
-        wbs = append(wbs, WorkBook{oleutil.MustGetProperty(mso.IdExcel, "WorkBooks", i).ToIDispatch()})
+        wbs = append(wbs, WorkBook{oleutil.MustGetProperty(mso.IdExcel, "WorkBooks", i).ToIDispatch(), mso})
     }
     return
 }
 
 //
 func (mso *MSO) WorkBookAdd() (WorkBook) {
-    return WorkBook{oleutil.MustCallMethod(mso.IdWorkBooks, "Add").ToIDispatch()}
+    return WorkBook{oleutil.MustCallMethod(mso.IdWorkBooks, "Add").ToIDispatch(), mso}
 }
 
 //
 func (mso *MSO) WorkBookOpen(full string) (WorkBook) {
     defer Except(0, "WorkBookOpen")
-    return WorkBook{oleutil.MustCallMethod(mso.IdWorkBooks, "open", full).ToIDispatch()}
+    return WorkBook{oleutil.MustCallMethod(mso.IdWorkBooks, "open", full).ToIDispatch(), mso}
 }
 
 //
 func (mso *MSO) WorkBookActivate(id interface {}) (wb WorkBook) {
     defer Except(0, "WorkBookActivate")
-    wb = WorkBook{mso.Pick("WorkBooks", id)}
+    wb = WorkBook{mso.Pick("WorkBooks", id), mso}
     wb.Activate()
     return
 }
 
 //
 func (mso *MSO) ActiveWorkBook() (WorkBook) {
-    return WorkBook{oleutil.MustGetProperty(mso.IdExcel, "ActiveWorkBook").ToIDispatch()}
+    return WorkBook{oleutil.MustGetProperty(mso.IdExcel, "ActiveWorkBook").ToIDispatch(), mso}
 }
 
 //
@@ -270,16 +271,18 @@ func (wbs WorkBooks) Save() {
 }
 
 //
-func (wbs WorkBooks) SaveAs(full string, args... interface{}) {
+func (wbs WorkBooks) SaveAs(args... interface{}) {
     num := len(wbs)
     if num<2 {
         for _, wb := range wbs {
-            wb.SaveAs(full)
+            wb.SaveAs(args...)
         }
     }  else {
+        full := args[0].(string)
         ext := filepath.Ext(full)
         for i, wb := range wbs {
-            wb.SaveAs(strings.Replace(full, ext, "_"+strconv.Itoa(i)+ext, 1))
+            args[0] = strings.Replace(full, ext, "_"+strconv.Itoa(i)+ext, 1)
+            wb.SaveAs(args...)
         }
 
     }
@@ -368,8 +371,6 @@ func Except(exit int, info string) {
         }
     }
 }
-
-
 
 
 
