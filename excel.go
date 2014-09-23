@@ -199,8 +199,10 @@ func (mso *MSO) WorkBooks() (wbs WorkBooks) {
 }
 
 //
-func (mso *MSO) WorkBookAdd() (WorkBook) {
-    return WorkBook{oleutil.MustCallMethod(mso.IdWorkBooks, "Add").ToIDispatch(), mso}
+func (mso *MSO) WorkBookAdd() (WorkBook, error) {
+    _wb , err := oleutil.CallMethod(mso.IdWorkBooks, "Add")
+    defer Except("WorkBookAdd", &err)
+    return WorkBook{_wb.ToIDispatch(), mso}, err
 }
 
 //
@@ -248,15 +250,16 @@ func (mso *MSO) Sheet(id interface {}) (Sheet, error) {
 }
 
 //
-func (mso *MSO) SheetAdd(wb *ole.IDispatch, args... string) (sheet Sheet) {
+func (mso *MSO) SheetAdd(wb *ole.IDispatch, args... string) (Sheet, error) {
     sheets := oleutil.MustGetProperty(wb, "Sheets").ToIDispatch()
     defer sheets.Release()
-    sheet = Sheet{oleutil.MustCallMethod(sheets, "Add").ToIDispatch()}
+    _sheet, err := oleutil.CallMethod(sheets, "Add")
+    sheet := Sheet{_sheet.ToIDispatch()}
     if args != nil {
         sheet.Name(args...)
     }
     sheet.Select()
-    return
+    return sheet, err
 }
 
 //
@@ -394,7 +397,7 @@ func Except(info string, err *error, functions... func()) {
                 info = "%"+info+":"+r.(string)
         }
         *err = errors.New(info)
-    } else if err != nil && *err !=nil {
+    } else if err != nil && *err != nil {
         *err = errors.New("%"+info+":"+(*err).Error())
     }
     if functions != nil {
