@@ -151,13 +151,13 @@ func Open(full string, options... Option) (mso *MSO, err error) {
 }
 
 //
-func (mso *MSO) Save() {
-    mso.WorkBooks().Save()
+func (mso *MSO) Save() ([]error) {
+    return mso.WorkBooks().Save()
 }
 
 //
-func (mso *MSO) SaveAs(args... interface{}) {
-    mso.WorkBooks().SaveAs(args...)
+func (mso *MSO) SaveAs(args... interface{}) ([]error) {
+    return mso.WorkBooks().SaveAs(args...)
 }
 
 //
@@ -268,40 +268,42 @@ func (mso *MSO) SheetSelect(id interface {}) (sheet Sheet, err error) {
 }
 
 //
-func (wbs WorkBooks) Save() {
+func (wbs WorkBooks) Save() (errs []error) {
     for _, wb := range wbs {
-        wb.Save()
+        errs = append(errs, wb.Save())
     }
+    return
 }
 
 //
-func (wbs WorkBooks) SaveAs(args... interface{}) {
+func (wbs WorkBooks) SaveAs(args... interface{}) (errs []error) {
     num := len(wbs)
     if num<2 {
         for _, wb := range wbs {
-            wb.SaveAs(args...)
+            errs = append(errs, wb.SaveAs(args...))
         }
     }  else {
         full := args[0].(string)
         ext := filepath.Ext(full)
         for i, wb := range wbs {
             args[0] = strings.Replace(full, ext, "_"+strconv.Itoa(i)+ext, 1)
-            wb.SaveAs(args...)
+            errs = append(errs, wb.SaveAs(args...))
         }
-
     }
+    return
 }
 
 //
-func (wbs WorkBooks) Close() {
+func (wbs WorkBooks) Close() (errs []error) {
     for _, wb := range wbs {
-        wb.Close()
+        errs = append(errs, wb.Close())
     }
+    return
 }
 
 //
 func (wb WorkBook) Activate() (err error) {
-    defer NoExcept()
+    defer Except("WorkBook.Activate", &err)
     _, err = oleutil.CallMethod(wb.Idisp, "Activate")
     return
 }
@@ -314,35 +316,35 @@ func (wb WorkBook) Name() (string) {
 
 //
 func (wb WorkBook) Save() (err error) {
-    defer NoExcept()
+    defer Except("WorkBook.Save", &err)
     _, err = oleutil.CallMethod(wb.Idisp, "Save")
     return
 }
 
 //
 func (wb WorkBook) SaveAs(args... interface{}) (err error) {
-    defer NoExcept()
+    defer Except("WorkBook.SaveAs", &err)
     _, err = oleutil.CallMethod(wb.Idisp, "SaveAs", args...)
     return
 }
 
 //
 func (wb WorkBook) Close() (err error) {
-    defer NoExcept()
+    defer Except("WorkBook.Close", &err)
     _, err = oleutil.CallMethod(wb.Idisp, "Close")
     return
 }
 
 //
 func (sheet Sheet) Select() (err error) {
-    defer NoExcept()
+    defer Except("Sheet.Select", &err)
     _, err = oleutil.CallMethod(sheet.Idisp, "Select")
     return
 }
 
 //
 func (sheet Sheet) Delete() (err error) {
-    defer NoExcept()
+    defer Except("Sheet.Delete", &err)
     _, err = oleutil.CallMethod(sheet.Idisp, "Delete")
     return
 }
