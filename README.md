@@ -23,10 +23,10 @@ import (
 
 func main() {
 	option := excel.Option{Visible: true, ScreenUpdating: true, DisplayAlerts: true}
-	xl := excel.New(option)      //xl := excel.Open("test_excel.xls", option)
+	xl, _ := excel.New(option)      //xl := excel.Open("test_excel.xls", option)
 	defer xl.Quit()
 
-	sheet := xl.Sheet(1)       //xl.Sheet("sheet1")
+	sheet, _ := xl.Sheet(1)         //xl.Sheet("sheet1")
 	for i:=2; i<=6; i++ {
 		sheet.Cells(2, i, 1000+i)
 	}

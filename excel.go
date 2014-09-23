@@ -1,13 +1,13 @@
 package excel
 
 import (
-    "os"
     "strconv"
     "strings"
     "path/filepath"
     "unsafe"
     "reflect"
-    "fmt"
+    "errors"
+    //"fmt"
     "github.com/mattn/go-ole"
     "github.com/mattn/go-ole/oleutil"
 )
@@ -91,7 +91,7 @@ func (va VARIANT) ToString() (ret string) {
     return
 }
 
-//
+//get fields of struct Option
 func (option Option) Fields() (ret []string) {
     fields := reflect.Indirect(reflect.ValueOf(option)).Type()
     num := fields.NumField()
@@ -103,7 +103,6 @@ func (option Option) Fields() (ret []string) {
 
 //
 func (mso *MSO) SetOption(option Option, args... int) {
-    defer Except(0, "SetOption")
     opts, curs := reflect.ValueOf(&mso.Option).Elem(), reflect.ValueOf(option)
     for _, key := range option.Fields() {
         opt, cur := opts.FieldByName(key), curs.FieldByName(key)
@@ -113,6 +112,7 @@ func (mso *MSO) SetOption(option Option, args... int) {
             oleutil.PutProperty(mso.IdExcel, key, curv)
         }
     }
+    return
 }
 
 //
@@ -137,18 +137,18 @@ func Init(options... Option) (mso *MSO) {
 }
 
 //
-func New(options... Option) (mso *MSO) {
-    defer Except(0, "New")
+func New(options... Option) (mso *MSO, err error){
+    defer Except("New", &err)
     mso = Init(options...)
     mso.WorkBookAdd()
     return
 }
 
 //
-func Open(full string, options... Option) (mso *MSO) {
-    defer Except(0, "Open")
+func Open(full string, options... Option) (mso *MSO, err error) {
+    defer Except("Open", &err)
     mso = Init(options...)
-    mso.WorkBookOpen(full)
+    _, err = mso.WorkBookOpen(full)
     return
 }
 
@@ -163,18 +163,19 @@ func (mso *MSO) SaveAs(args... interface{}) {
 }
 
 //
-func (mso *MSO) Quit() {
-    defer Except(0, "Quit", ole.CoUninitialize)
+func (mso *MSO) Quit() (err error) {
+    defer Except("Quit", &err, ole.CoUninitialize)
     oleutil.MustCallMethod(mso.IdWorkBooks, "Close")
     oleutil.MustCallMethod(mso.IdExcel, "Quit")
     mso.IdWorkBooks.Release()
     mso.IdExcel.Release()
     mso.IuApp.Release()
+    return
 }
 
 //
-func (mso *MSO) Pick(workx string, id interface {}) (ret *ole.IDispatch) {
-    defer Except(0, "mso.Pick")
+func (mso *MSO) Pick(workx string, id interface {}) (ret *ole.IDispatch, err error) {
+    defer Except("Pick", &err)
     if id_int, ok := id.(int); ok {
         ret = oleutil.MustGetProperty(mso.IdExcel, workx, id_int).ToIDispatch()
     } else if id_str, ok := id.(string); ok {
@@ -203,28 +204,30 @@ func (mso *MSO) WorkBookAdd() (WorkBook) {
 }
 
 //
-func (mso *MSO) WorkBookOpen(full string) (WorkBook) {
-    defer Except(0, "WorkBookOpen")
-    return WorkBook{oleutil.MustCallMethod(mso.IdWorkBooks, "open", full).ToIDispatch(), mso}
+func (mso *MSO) WorkBookOpen(full string) (WorkBook, error) {
+    _wb, err := oleutil.CallMethod(mso.IdWorkBooks, "open", full)
+    defer Except("WorkBookOpen", &err)
+    return WorkBook{_wb.ToIDispatch(), mso}, err
 }
 
 //
-func (mso *MSO) WorkBookActivate(id interface {}) (wb WorkBook) {
-    defer Except(0, "WorkBookActivate")
-    wb = WorkBook{mso.Pick("WorkBooks", id), mso}
+func (mso *MSO) WorkBookActivate(id interface {}) (wb WorkBook, err error) {
+    defer Except("WorkBookActivate", &err)
+    _wb, _ := mso.Pick("WorkBooks", id)
+    wb = WorkBook{_wb, mso}
     wb.Activate()
     return
 }
 
 //
-func (mso *MSO) ActiveWorkBook() (WorkBook) {
-    return WorkBook{oleutil.MustGetProperty(mso.IdExcel, "ActiveWorkBook").ToIDispatch(), mso}
+func (mso *MSO) ActiveWorkBook() (WorkBook, error) {
+    _wb, err := oleutil.GetProperty(mso.IdExcel, "ActiveWorkBook")
+    return WorkBook{_wb.ToIDispatch(), mso}, err
 }
 
 //
 func (mso *MSO) SheetsCount() (int) {
     sheets := oleutil.MustGetProperty(mso.IdExcel, "Sheets").ToIDispatch()
-    defer sheets.Release()
     return (int)(oleutil.MustGetProperty(sheets, "Count").Val)
 }
 
@@ -239,8 +242,9 @@ func (mso *MSO) Sheets() (sheets []Sheet) {
 }
 
 //
-func (mso *MSO) Sheet(id interface {}) (Sheet) {
-    return Sheet{mso.Pick("WorkSheets", id)}
+func (mso *MSO) Sheet(id interface {}) (Sheet, error) {
+    _sheet, err := mso.Pick("WorkSheets", id)
+    return Sheet{_sheet}, err
 }
 
 //
@@ -256,8 +260,8 @@ func (mso *MSO) SheetAdd(wb *ole.IDispatch, args... string) (sheet Sheet) {
 }
 
 //
-func (mso *MSO) SheetSelect(id interface {}) (sheet Sheet) {
-    sheet = mso.Sheet(id)
+func (mso *MSO) SheetSelect(id interface {}) (sheet Sheet, err error) {
+    sheet, err = mso.Sheet(id)
     sheet.Select()
     return
 }
@@ -295,47 +299,56 @@ func (wbs WorkBooks) Close() {
 }
 
 //
-func (wb WorkBook) Activate() {
-    defer Except(0, "WorkBook.Activate")
-    oleutil.MustCallMethod(wb.Idisp, "Activate")
+func (wb WorkBook) Activate() (err error) {
+    defer NoExcept()
+    _, err = oleutil.CallMethod(wb.Idisp, "Activate")
+    return
 }
 
 //
 func (wb WorkBook) Name() (string) {
+    defer NoExcept()
     return oleutil.MustGetProperty(wb.Idisp, "Name").ToString()
 }
 
 //
-func (wb WorkBook) Save() {
-    defer Except(0, "WorkBook.Save")
-    oleutil.MustCallMethod(wb.Idisp, "Save")
+func (wb WorkBook) Save() (err error) {
+    defer NoExcept()
+    _, err = oleutil.CallMethod(wb.Idisp, "Save")
+    return
 }
 
 //
-func (wb WorkBook) SaveAs(args... interface{}) {
-    defer Except(0, "WorkBook.SaveAs")
-    oleutil.MustCallMethod(wb.Idisp, "SaveAs", args...)
+func (wb WorkBook) SaveAs(args... interface{}) (err error) {
+    defer NoExcept()
+    _, err = oleutil.CallMethod(wb.Idisp, "SaveAs", args...)
+    return
 }
 
 //
-func (wb WorkBook) Close() {
-    defer Except(0, "WorkBook.Close")
-    oleutil.MustCallMethod(wb.Idisp, "Close")
+func (wb WorkBook) Close() (err error) {
+    defer NoExcept()
+    _, err = oleutil.CallMethod(wb.Idisp, "Close")
+    return
 }
 
 //
-func (sheet Sheet) Select() {
-    defer Except(0, "Sheet.Select")
-    oleutil.MustCallMethod(sheet.Idisp, "Select")
+func (sheet Sheet) Select() (err error) {
+    defer NoExcept()
+    _, err = oleutil.CallMethod(sheet.Idisp, "Select")
+    return
 }
 
 //
-func (sheet Sheet) Delete() {
-    oleutil.MustCallMethod(sheet.Idisp, "Delete")
+func (sheet Sheet) Delete() (err error) {
+    defer NoExcept()
+    _, err = oleutil.CallMethod(sheet.Idisp, "Delete")
+    return
 }
 
 //
 func (sheet Sheet) Name(args... string) (name string) {
+    defer NoExcept()
     if args == nil {
         name = oleutil.MustGetProperty(sheet.Idisp, "Name").ToString()
     } else {
@@ -345,11 +358,10 @@ func (sheet Sheet) Name(args... string) (name string) {
     return
 }
 
-//
+//get value as string/set
 func (sheet Sheet) Cells(r int, c int, vals...interface{}) (ret string) {
-    defer Except(0, "Cells")
+    defer NoExcept()
     cell := oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()
-    defer cell.Release()
     if vals == nil {
         //ret = oleutil.MustGetProperty(cell, "Value").ToString()
         ret = VARIANT{oleutil.MustGetProperty(cell, "Value")}.ToString()
@@ -359,7 +371,7 @@ func (sheet Sheet) Cells(r int, c int, vals...interface{}) (ret string) {
     return
 }
 
-//(5,27) convert to "AA5"  // xp+office2003 cant use cell(1,1)
+//convert (5,27) to "AA5", xp+office2003 cant use cell(1,1)
 func Cell2r(x, y int) (ret string) {
     for y>0 {
         a, b := int(y/26), y%26
@@ -374,21 +386,33 @@ func Cell2r(x, y int) (ret string) {
 }
 
 //
-func Except(exit int, info string, functions... func()) {
+func Except(info string, err *error, functions... func()) {
     r := recover()
     if r != nil {
-        fmt.Println("Except:", info, r)
+        switch r.(type) {
+            case string:
+                info = "%"+info+":"+r.(string)
+        }
+        *err = errors.New(info)
+    } else if *err !=nil {
+        *err = errors.New("%"+info+":"+(*err).Error())
     }
+    if functions != nil {
+        NoExcept(functions...)
+    }
+}
+
+//
+func NoExcept(functions... func()) {
+    recover()
     for _, funcx := range functions {
         func() {
             defer func() {recover()}()
             funcx()
         }()
     }
-    if r != nil && exit>0 {
-        os.Exit(exit)
-    }
 }
+
 
 
 
