@@ -394,7 +394,7 @@ func Except(info string, err *error, functions... func()) {
                 info = "%"+info+":"+r.(string)
         }
         *err = errors.New(info)
-    } else if *err !=nil {
+    } else if err != nil && *err !=nil {
         *err = errors.New("%"+info+":"+(*err).Error())
     }
     if functions != nil {
