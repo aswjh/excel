@@ -7,6 +7,7 @@ import (
     "unsafe"
     "reflect"
     "errors"
+    //"unicode"
     //"fmt"
     "github.com/mattn/go-ole"
     "github.com/mattn/go-ole/oleutil"
@@ -91,13 +92,14 @@ func (va VARIANT) ToString() (ret string) {
 }
 
 //get fields of struct Option
-func (option Option) Fields() (ret []string) {
+func (option Option) Fields() ([]string) {
     fields := reflect.Indirect(reflect.ValueOf(option)).Type()
     num := fields.NumField()
+    ret := make([]string, num)
     for i:=0; i<num; i++ {
-        ret = append(ret, fields.Field(i).Name)
+        ret[i] = fields.Field(i).Name
     }
-    return
+    return ret
 }
 
 //
@@ -363,8 +365,8 @@ func (sheet Sheet) Name(args... string) (name string) {
 
 //get value as string/set
 func (sheet Sheet) Cells(r int, c int, vals...interface{}) (ret string) {
-    defer NoExcept()
     cell := oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()
+    defer NoExcept(cell.Release)
     if vals == nil {
         //ret = oleutil.MustGetProperty(cell, "Value").ToString()
         ret = VARIANT{oleutil.MustGetProperty(cell, "Value")}.ToString()
@@ -389,7 +391,7 @@ func Cell2r(x, y int) (ret string) {
 }
 
 //
-func Except(info string, err *error, functions... func()) {
+func Except(info string, err *error, functions... interface{}) {
     r := recover()
     if r != nil {
         switch r.(type) {
@@ -398,7 +400,7 @@ func Except(info string, err *error, functions... func()) {
         }
         *err = errors.New(info)
     } else if err != nil && *err != nil {
-        *err = errors.New("%"+info+":"+(*err).Error())
+        *err = errors.New("%"+info+"%"+(*err).Error())
     }
     if functions != nil {
         NoExcept(functions...)
@@ -406,13 +408,16 @@ func Except(info string, err *error, functions... func()) {
 }
 
 //
-func NoExcept(functions... func()) {
+func NoExcept(functions... interface{}) {
     recover()
-    for _, funcx := range functions {
-        func() {
-            defer func() {recover()}()
-            funcx()
-        }()
+    for _, one := range functions {
+        funcx := reflect.ValueOf(one)
+        if funcx.Kind().String() == "func" {
+            func() {
+                defer func() {recover()}()
+                funcx.Call(nil)
+            }()
+        }
     }
 }
 
