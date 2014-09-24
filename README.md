@@ -31,7 +31,7 @@ func main() {
 		sheet.MustCells(2, i, 1000+i)
 	}
 
-	println("cell strings: ", sheet.MustCells(2, 1), sheet.MustCells(2, 2), sheet.MustCells(2, 3))
+	println("cell strings:", sheet.MustCells(2, 2), sheet.MustCells(2, 3))
 	time.Sleep(3000000000)
 
 	xl.SaveAs("test_excel.xls")
