@@ -8,7 +8,7 @@ import (
     "reflect"
     "errors"
     //"unicode"
-    //"fmt"
+    "fmt"
     "github.com/mattn/go-ole"
     "github.com/mattn/go-ole/oleutil"
 )
@@ -394,11 +394,7 @@ func Cell2r(x, y int) (ret string) {
 func Except(info string, err *error, functions... interface{}) {
     r := recover()
     if r != nil {
-        switch r.(type) {
-            case string:
-                info = "%"+info+":"+r.(string)
-        }
-        *err = errors.New(info)
+        *err = errors.New(fmt.Sprintf("*"+info+":", r))
     } else if err != nil && *err != nil {
         *err = errors.New("%"+info+"%"+(*err).Error())
     }
@@ -420,8 +416,6 @@ func NoExcept(functions... interface{}) {
         }
     }
 }
-
-
 
 
 
