@@ -7,7 +7,6 @@ import (
     "unsafe"
     "reflect"
     "errors"
-    //"unicode"
     "fmt"
     "github.com/mattn/go-ole"
     "github.com/mattn/go-ole/oleutil"
@@ -48,44 +47,44 @@ type VARIANT struct {
 func (va VARIANT) ToString() (ret string) {
     switch va.VT {
         case 2:
-            v2:=(*int16)(unsafe.Pointer(&va.Val))
+            v2 := (*int16)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatInt(int64(*v2), 10)
         case 3:
-            v3:=(*int32)(unsafe.Pointer(&va.Val))
+            v3 := (*int32)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatInt(int64(*v3), 10)
         case 4:
-            v4:=(*float32)(unsafe.Pointer(&va.Val))
+            v4 := (*float32)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatFloat(float64(*v4), 'f', 2, 64)
         case 5:
-            v5:=(*float64)(unsafe.Pointer(&va.Val))
+            v5 := (*float64)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatFloat(*v5, 'f', 2, 64)
         case 8:       //string
-            v8:=(**uint16)(unsafe.Pointer(&va.Val))
+            v8 := (**uint16)(unsafe.Pointer(&va.Val))
             ret = ole.UTF16PtrToString(*v8)
         case 11:
-            v11:=(*bool)(unsafe.Pointer(&va.Val))
+            v11 := (*bool)(unsafe.Pointer(&va.Val))
             if *v11 {
                 ret = "TRUE"
             } else {
                 ret = "FALSE"
             }
         case 16:
-            v16:=(*int8)(unsafe.Pointer(&va.Val))
+            v16 := (*int8)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatInt(int64(*v16), 10)
         case 17:
-            v17:=(*uint8)(unsafe.Pointer(&va.Val))
+            v17 := (*uint8)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatUint(uint64(*v17), 10)
         case 18:
-            v18:=(*uint16)(unsafe.Pointer(&va.Val))
+            v18 := (*uint16)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatUint(uint64(*v18), 10)
         case 19:
-            v19:=(*uint32)(unsafe.Pointer(&va.Val))
+            v19 := (*uint32)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatUint(uint64(*v19), 10)
         case 20:
-            v20:=(*int64)(unsafe.Pointer(&va.Val))
+            v20 := (*int64)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatInt(int64(*v20), 10)
         case 21:
-            v21:=(*uint64)(unsafe.Pointer(&va.Val))
+            v21 := (*uint64)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatUint(uint64(*v21), 10)
     }
     return
@@ -363,15 +362,24 @@ func (sheet Sheet) Name(args... string) (name string) {
     return
 }
 
-//get value as string/set
-func (sheet Sheet) Cells(r int, c int, vals...interface{}) (ret string) {
+//get value as string/put
+func (sheet Sheet) Cells(r int, c int, vals...interface{}) (ret string, err error) {
+    defer Except("Sheet.Cells", &err)
     cell := oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()
     defer NoExcept(cell.Release)
     if vals == nil {
-        //ret = oleutil.MustGetProperty(cell, "Value").ToString()
         ret = VARIANT{oleutil.MustGetProperty(cell, "Value")}.ToString()
     } else {
         oleutil.PutProperty(cell, "Value", vals[0])
+    }
+    return
+}
+
+//Must get value as string/put
+func (sheet Sheet) MustCells(r int, c int, vals...interface{}) (ret string) {
+    ret, err := sheet.Cells(r, c, vals...)
+    if err != nil {
+        panic(err.Error())
     }
     return
 }
@@ -394,7 +402,7 @@ func Cell2r(x, y int) (ret string) {
 func Except(info string, err *error, functions... interface{}) {
     r := recover()
     if r != nil {
-        *err = errors.New(fmt.Sprintf("*"+info+":", r))
+        *err = errors.New(fmt.Sprintf("*"+info+":%+v", r))
     } else if err != nil && *err != nil {
         *err = errors.New("%"+info+"%"+(*err).Error())
     }
@@ -416,6 +424,8 @@ func NoExcept(functions... interface{}) {
         }
     }
 }
+
+
 
 
 
