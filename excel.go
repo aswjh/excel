@@ -38,7 +38,6 @@ type Sheet struct {
     Idisp *ole.IDispatch
 }
 
-//
 type VARIANT struct {
     *ole.VARIANT
 }
@@ -58,7 +57,7 @@ func (va VARIANT) ToString() (ret string) {
         case 5:
             v5 := (*float64)(unsafe.Pointer(&va.Val))
             ret = strconv.FormatFloat(*v5, 'f', 2, 64)
-        case 8:       //string
+        case 8:                     //string
             v8 := (**uint16)(unsafe.Pointer(&va.Val))
             ret = ole.UTF16PtrToString(*v8)
         case 11:
@@ -90,24 +89,15 @@ func (va VARIANT) ToString() (ret string) {
     return
 }
 
-//get fields of struct Option
-func (option Option) Fields() ([]string) {
-    fields := reflect.Indirect(reflect.ValueOf(option)).Type()
-    num := fields.NumField()
-    ret := make([]string, num)
-    for i:=0; i<num; i++ {
-        ret[i] = fields.Field(i).Name
-    }
-    return ret
-}
-
 //
 func (mso *MSO) SetOption(option Option, args... int) {
     opts, curs := reflect.ValueOf(&mso.Option).Elem(), reflect.ValueOf(option)
-    for _, key := range option.Fields() {
+    tys, isinit := reflect.Indirect(curs).Type(), args != nil && args[0] > 0
+    for i:=opts.NumField()-1; i>=0; i-- {
+        key := tys.Field(i).Name
         opt, cur := opts.FieldByName(key), curs.FieldByName(key)
         optv, curv := opt.Bool(), cur.Bool()
-        if (args != nil && args[0] > 0) || optv != curv {
+        if isinit || optv != curv {
             opt.SetBool(curv)
             oleutil.PutProperty(mso.IdExcel, key, curv)
         }
@@ -164,6 +154,11 @@ func (mso *MSO) SaveAs(args... interface{}) ([]error) {
 //
 func (mso *MSO) Quit() (err error) {
     defer Except("Quit", &err, ole.CoUninitialize)
+    if r := recover(); r != nil {   //catch panic of which defering Quit, because recover is only useful inside defer.
+        info := fmt.Sprintf("***panic before Quit: %+v", r)
+        fmt.Println(info)
+        err = errors.New(info)
+    }
     oleutil.MustCallMethod(mso.IdWorkBooks, "Close")
     oleutil.MustCallMethod(mso.IdExcel, "Quit")
     mso.IdWorkBooks.Release()
@@ -364,9 +359,8 @@ func (sheet Sheet) Name(args... string) (name string) {
 
 //get value as string/put
 func (sheet Sheet) Cells(r int, c int, vals...interface{}) (ret string, err error) {
-    defer Except("Sheet.Cells", &err)
     cell := oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()
-    defer NoExcept(cell.Release)
+    defer Except("Sheet.Cells", &err, cell.Release)
     if vals == nil {
         ret = VARIANT{oleutil.MustGetProperty(cell, "Value")}.ToString()
     } else {
@@ -402,7 +396,7 @@ func Cell2r(x, y int) (ret string) {
 func Except(info string, err *error, functions... interface{}) {
     r := recover()
     if r != nil {
-        *err = errors.New(fmt.Sprintf("*"+info+":%+v", r))
+        *err = errors.New(fmt.Sprintf("*"+info+": %+v", r))
     } else if err != nil && *err != nil {
         *err = errors.New("%"+info+"%"+(*err).Error())
     }
@@ -412,18 +406,43 @@ func Except(info string, err *error, functions... interface{}) {
 }
 
 //
-func NoExcept(functions... interface{}) {
+func NoExcept(paras... interface{}) {
     recover()
-    for _, one := range functions {
-        funcx := reflect.ValueOf(one)
-        if funcx.Kind().String() == "func" {
-            func() {
-                defer func() {recover()}()
-                funcx.Call(nil)
-            }()
+    if paras != nil {
+        prei, args := -1, []reflect.Value{}
+        for i, one := range paras {
+            cur := reflect.ValueOf(one)
+            if cur.Kind().String() == "func" {
+                if prei > -1 {
+                    RftCall(reflect.ValueOf(paras[prei]), args...)
+                }
+                prei, args = i, []reflect.Value{}
+            } else {
+                args = append(args, cur)
+            }
+        }
+        if prei > -1 {
+            RftCall(reflect.ValueOf(paras[prei]), args...)
         }
     }
 }
+
+//
+func RftCall(function reflect.Value, args... reflect.Value) (err error) {
+    defer func() {
+        if r := recover(); r != nil {
+            err = errors.New(fmt.Sprintf("RftCall panic: %+v", r))
+        }
+    }()
+    function.Call(args)
+    return
+}
+
+
+
+
+
+
 
 
 
