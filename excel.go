@@ -90,22 +90,6 @@ func (va VARIANT) ToString() (ret string) {
 }
 
 //
-func (mso *MSO) SetOption(option Option, args... int) {
-    opts, curs := reflect.ValueOf(&mso.Option).Elem(), reflect.ValueOf(option)
-    tys, isinit := reflect.Indirect(curs).Type(), args != nil && args[0] > 0
-    for i:=opts.NumField()-1; i>=0; i-- {
-        key := tys.Field(i).Name
-        opt, cur := opts.FieldByName(key), curs.FieldByName(key)
-        optv, curv := opt.Bool(), cur.Bool()
-        if isinit || optv != curv {
-            opt.SetBool(curv)
-            oleutil.PutProperty(mso.IdExcel, key, curv)
-        }
-    }
-    return
-}
-
-//
 func Init(options... Option) (mso *MSO) {
     ole.CoInitialize(0)
     app, _ := oleutil.CreateObject("Excel.Application")
@@ -164,6 +148,23 @@ func (mso *MSO) Quit() (err error) {
     mso.IdWorkBooks.Release()
     mso.IdExcel.Release()
     mso.IuApp.Release()
+    return
+}
+
+//
+func (mso *MSO) SetOption(option Option, args... int) (err error) {
+    defer Except("SetOption", &err)
+    opts, curs := reflect.ValueOf(&mso.Option).Elem(), reflect.ValueOf(option)
+    tys, isinit := reflect.Indirect(curs).Type(), args != nil && args[0] > 0
+    for i:=curs.NumField()-1; i>=0; i-- {
+        key := tys.Field(i).Name
+        opt, cur := opts.FieldByName(key), curs.FieldByName(key)
+        optv, curv := opt.Bool(), cur.Bool()
+        if isinit || optv != curv {
+            opt.SetBool(curv)
+            oleutil.PutProperty(mso.IdExcel, key, curv)
+        }
+    }
     return
 }
 
@@ -393,28 +394,30 @@ func Cell2r(x, y int) (ret string) {
 }
 
 //
-func Except(info string, err *error, functions... interface{}) {
+func Except(info string, err *error, funcs... interface{}) {
     r := recover()
-    if r != nil {
-        *err = errors.New(fmt.Sprintf("*"+info+": %+v", r))
-    } else if err != nil && *err != nil {
-        *err = errors.New("%"+info+"%"+(*err).Error())
+    if err != nil {
+        if r != nil {
+            *err = errors.New(fmt.Sprintf("*"+info+": %+v", r))
+        } else if *err != nil {
+            *err = errors.New("%"+info+"%"+(*err).Error())
+        }
     }
-    if functions != nil {
-        NoExcept(functions...)
+    if funcs != nil {
+        NoExcept(funcs...)
     }
 }
 
 //
-func NoExcept(paras... interface{}) {
+func NoExcept(funcs... interface{}) {
     recover()
-    if paras != nil {
+    if funcs != nil {
         prei, args := -1, []reflect.Value{}
-        for i, one := range paras {
+        for i, one := range funcs {
             cur := reflect.ValueOf(one)
             if cur.Kind().String() == "func" {
                 if prei > -1 {
-                    RftCall(reflect.ValueOf(paras[prei]), args...)
+                    RftCall(reflect.ValueOf(funcs[prei]), args...)
                 }
                 prei, args = i, []reflect.Value{}
             } else {
@@ -422,7 +425,7 @@ func NoExcept(paras... interface{}) {
             }
         }
         if prei > -1 {
-            RftCall(reflect.ValueOf(paras[prei]), args...)
+            RftCall(reflect.ValueOf(funcs[prei]), args...)
         }
     }
 }
@@ -437,9 +440,6 @@ func RftCall(function reflect.Value, args... reflect.Value) (err error) {
     function.Call(args)
     return
 }
-
-
-
 
 
 
