@@ -70,6 +70,41 @@ func (va VARIANT) Value() (val interface{}) {
 }
 
 //
+func String(val interface{}) (ret string) {
+    switch val.(type) {
+        case int16:
+            ret = strconv.FormatInt(int64(val.(int16)), 10)
+        case int32:
+            ret = strconv.FormatInt(int64(val.(int32)), 10)
+        case float32:
+            ret = strconv.FormatFloat(float64(val.(float32)), 'f', 2, 64)
+        case float64:
+            ret = strconv.FormatFloat(val.(float64), 'f', 2, 64)
+        case *uint16:                     //string
+            ret = ole.UTF16PtrToString(val.(*uint16))
+        case bool:
+            if val.(bool) {
+                ret = "true"
+            } else {
+                ret = "false"
+            }
+        case int8:
+            ret = strconv.FormatInt(int64(val.(int8)), 10)
+        case uint8:
+            ret = strconv.FormatUint(uint64(val.(uint8)), 10)
+        case uint16:
+            ret = strconv.FormatUint(uint64(val.(uint16)), 10)
+        case uint32:
+            ret = strconv.FormatUint(uint64(val.(uint32)), 10)
+        case int64:
+            ret = strconv.FormatInt(val.(int64), 10)
+        case uint64:
+            ret = strconv.FormatUint(val.(uint64), 10)
+    }
+    return
+}
+
+//
 func Init(options... Option) (mso *MSO) {
     ole.CoInitialize(0)
     app, _ := oleutil.CreateObject("Excel.Application")
@@ -386,7 +421,10 @@ func (sheet Sheet) PutCells(r int, c int, args... interface{}) (err error) {
 func (sheet Sheet) Cells(r int, c int, vals... interface{}) (ret string, err error) {
     defer Except("Sheet.Cells", &err)
     if vals == nil {
-        ret = fmt.Sprintf("%+v", sheet.MustGetCells(r, c))
+        v := sheet.MustGetCells(r, c)
+        if v != nil {
+            ret = String(v)
+        }
     } else {
         err = sheet.PutCells(r, c, vals[0])
     }
