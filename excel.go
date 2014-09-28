@@ -12,11 +12,7 @@ import (
     "github.com/mattn/go-ole/oleutil"
 )
 
-type Option struct {
-    Visible                      bool
-    DisplayAlerts                bool
-    ScreenUpdating               bool
-}
+type Option map[string]interface{}
 
 type MSO struct {
     Option
@@ -42,49 +38,33 @@ type VARIANT struct {
     *ole.VARIANT
 }
 
-//convert MS VARIANT to string
-func (va VARIANT) ToString() (ret string) {
+//get val of MS VARIANT
+func (va VARIANT) Value() (val interface{}) {
     switch va.VT {
         case 2:
-            v2 := (*int16)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatInt(int64(*v2), 10)
+            val = *((*int16)(unsafe.Pointer(&va.Val)))
         case 3:
-            v3 := (*int32)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatInt(int64(*v3), 10)
+            val = *((*int32)(unsafe.Pointer(&va.Val)))
         case 4:
-            v4 := (*float32)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatFloat(float64(*v4), 'f', 2, 64)
+            val = *((*float32)(unsafe.Pointer(&va.Val)))
         case 5:
-            v5 := (*float64)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatFloat(*v5, 'f', 2, 64)
+            val =*((*float64)(unsafe.Pointer(&va.Val)))
         case 8:                     //string
-            v8 := (**uint16)(unsafe.Pointer(&va.Val))
-            ret = ole.UTF16PtrToString(*v8)
+            val = *((**uint16)(unsafe.Pointer(&va.Val)))
         case 11:
-            v11 := (*bool)(unsafe.Pointer(&va.Val))
-            if *v11 {
-                ret = "TRUE"
-            } else {
-                ret = "FALSE"
-            }
+            val = *((*bool)(unsafe.Pointer(&va.Val)))
         case 16:
-            v16 := (*int8)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatInt(int64(*v16), 10)
+            val = *((*int8)(unsafe.Pointer(&va.Val)))
         case 17:
-            v17 := (*uint8)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatUint(uint64(*v17), 10)
+            val = *((*uint8)(unsafe.Pointer(&va.Val)))
         case 18:
-            v18 := (*uint16)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatUint(uint64(*v18), 10)
+            val = *((*uint16)(unsafe.Pointer(&va.Val)))
         case 19:
-            v19 := (*uint32)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatUint(uint64(*v19), 10)
+            val = *((*uint32)(unsafe.Pointer(&va.Val)))
         case 20:
-            v20 := (*int64)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatInt(int64(*v20), 10)
+            val = *((*int64)(unsafe.Pointer(&va.Val)))
         case 21:
-            v21 := (*uint64)(unsafe.Pointer(&va.Val))
-            ret = strconv.FormatUint(uint64(*v21), 10)
+            val = *((*uint64)(unsafe.Pointer(&va.Val)))
     }
     return
 }
@@ -97,7 +77,7 @@ func Init(options... Option) (mso *MSO) {
     wbs := oleutil.MustGetProperty(excel, "WorkBooks").ToIDispatch()
     ver, _ := strconv.ParseFloat(oleutil.MustGetProperty(excel, "Version").ToString(), 64)
 
-    option := Option{Visible: true, DisplayAlerts: true, ScreenUpdating: true}
+    option := Option{"Visible": true, "DisplayAlerts": true, "ScreenUpdating": true}
     if options != nil {
         option = options[0]
     }
@@ -113,7 +93,7 @@ func Init(options... Option) (mso *MSO) {
 func New(options... Option) (mso *MSO, err error){
     defer Except("New", &err)
     mso = Init(options...)
-    mso.WorkBookAdd()
+    _, err = mso.AddWorkBook()
     return
 }
 
@@ -121,7 +101,7 @@ func New(options... Option) (mso *MSO, err error){
 func Open(full string, options... Option) (mso *MSO, err error) {
     defer Except("Open", &err)
     mso = Init(options...)
-    _, err = mso.WorkBookOpen(full)
+    _, err = mso.OpenWorkBook(full)
     return
 }
 
@@ -138,7 +118,7 @@ func (mso *MSO) SaveAs(args... interface{}) ([]error) {
 //
 func (mso *MSO) Quit() (err error) {
     defer Except("Quit", &err, ole.CoUninitialize)
-    if r := recover(); r != nil {   //catch panic of which defering Quit, because recover is only useful inside defer.
+    if r := recover(); r != nil {   //catch panic of which defering Quit.
         info := fmt.Sprintf("***panic before Quit: %+v", r)
         fmt.Println(info)
         err = errors.New(info)
@@ -152,41 +132,49 @@ func (mso *MSO) Quit() (err error) {
 }
 
 //
-func (mso *MSO) SetOption(option Option, args... int) (err error) {
+func (mso *MSO) SetOption(args... interface{}) (err error) {
     defer Except("SetOption", &err)
-    opts, curs := reflect.ValueOf(&mso.Option).Elem(), reflect.ValueOf(option)
-    tys, isinit := reflect.Indirect(curs).Type(), args != nil && args[0] > 0
-    for i:=curs.NumField()-1; i>=0; i-- {
-        key := tys.Field(i).Name
-        opt, cur := opts.FieldByName(key), curs.FieldByName(key)
-        optv, curv := opt.Bool(), cur.Bool()
-        if isinit || optv != curv {
-            opt.SetBool(curv)
-            oleutil.PutProperty(mso.IdExcel, key, curv)
+    leng := len(args)
+    if leng>0 {
+        opts, curs, isinit := mso.Option, Option{}, false
+        if options, ok := args[0].(Option); ok {
+            curs, isinit = options, leng==2 && args[1].(int) > 0
+        } else if key, ok := args[0].(string); ok {
+            curs[key] = args[1]
+        }
+        for key, val := range curs {
+            if isinit {
+                oleutil.PutProperty(mso.IdExcel, key, val)
+            } else if opt, ok := opts[key]; ! ok || val != opt {
+                oleutil.PutProperty(mso.IdExcel, key, val)
+                opts[key] = val
+            }
         }
     }
     return
 }
 
 //
-func (mso *MSO) Pick(workx string, id interface {}) (ret *ole.IDispatch, err error) {
+func (mso *MSO) Pick(workx string, id interface{}) (ret *ole.IDispatch, err error) {
     defer Except("Pick", &err)
     if id_int, ok := id.(int); ok {
         ret = oleutil.MustGetProperty(mso.IdExcel, workx, id_int).ToIDispatch()
     } else if id_str, ok := id.(string); ok {
         ret = oleutil.MustGetProperty(mso.IdExcel, workx, id_str).ToIDispatch()
+    } else {
+        err = errors.New("sheet id incorrect")
     }
     return
 }
 
 //
-func (mso *MSO) WorkBooksCount() (int) {
+func (mso *MSO) CountWorkBooks() (int) {
     return (int)(oleutil.MustGetProperty(mso.IdWorkBooks, "Count").Val)
 }
 
 //
 func (mso *MSO) WorkBooks() (wbs WorkBooks) {
-    num := mso.WorkBooksCount()
+    num := mso.CountWorkBooks()
     for i:=1; i<=num; i++ {
         wbs = append(wbs, WorkBook{oleutil.MustGetProperty(mso.IdExcel, "WorkBooks", i).ToIDispatch(), mso})
     }
@@ -194,22 +182,22 @@ func (mso *MSO) WorkBooks() (wbs WorkBooks) {
 }
 
 //
-func (mso *MSO) WorkBookAdd() (WorkBook, error) {
+func (mso *MSO) AddWorkBook() (WorkBook, error) {
     _wb , err := oleutil.CallMethod(mso.IdWorkBooks, "Add")
-    defer Except("WorkBookAdd", &err)
+    defer Except("AddWorkBook", &err)
     return WorkBook{_wb.ToIDispatch(), mso}, err
 }
 
 //
-func (mso *MSO) WorkBookOpen(full string) (WorkBook, error) {
+func (mso *MSO) OpenWorkBook(full string) (WorkBook, error) {
     _wb, err := oleutil.CallMethod(mso.IdWorkBooks, "open", full)
-    defer Except("WorkBookOpen", &err)
+    defer Except("OpenWorkBook", &err)
     return WorkBook{_wb.ToIDispatch(), mso}, err
 }
 
 //
-func (mso *MSO) WorkBookActivate(id interface {}) (wb WorkBook, err error) {
-    defer Except("WorkBookActivate", &err)
+func (mso *MSO) ActivateWorkBook(id interface{}) (wb WorkBook, err error) {
+    defer Except("ActivateWorkBook", &err)
     _wb, _ := mso.Pick("WorkBooks", id)
     wb = WorkBook{_wb, mso}
     wb.Activate()
@@ -223,14 +211,14 @@ func (mso *MSO) ActiveWorkBook() (WorkBook, error) {
 }
 
 //
-func (mso *MSO) SheetsCount() (int) {
+func (mso *MSO) CountSheets() (int) {
     sheets := oleutil.MustGetProperty(mso.IdExcel, "Sheets").ToIDispatch()
     return (int)(oleutil.MustGetProperty(sheets, "Count").Val)
 }
 
 //
 func (mso *MSO) Sheets() (sheets []Sheet) {
-    num := mso.SheetsCount()
+    num := mso.CountSheets()
     for i:=1; i<=num; i++ {
         sheet := Sheet{oleutil.MustGetProperty(mso.IdExcel, "WorkSheets", i).ToIDispatch()}
         sheets = append(sheets, sheet)
@@ -245,7 +233,7 @@ func (mso *MSO) Sheet(id interface {}) (Sheet, error) {
 }
 
 //
-func (mso *MSO) SheetAdd(wb *ole.IDispatch, args... string) (Sheet, error) {
+func (mso *MSO) AddSheet(wb *ole.IDispatch, args... string) (Sheet, error) {
     sheets := oleutil.MustGetProperty(wb, "Sheets").ToIDispatch()
     defer sheets.Release()
     _sheet, err := oleutil.CallMethod(sheets, "Add")
@@ -258,7 +246,7 @@ func (mso *MSO) SheetAdd(wb *ole.IDispatch, args... string) (Sheet, error) {
 }
 
 //
-func (mso *MSO) SheetSelect(id interface {}) (sheet Sheet, err error) {
+func (mso *MSO) SelectSheet(id interface{}) (sheet Sheet, err error) {
     sheet, err = mso.Sheet(id)
     sheet.Select()
     return
@@ -358,20 +346,55 @@ func (sheet Sheet) Name(args... string) (name string) {
     return
 }
 
-//get value as string/put
-func (sheet Sheet) Cells(r int, c int, vals...interface{}) (ret string, err error) {
+//get Property as interface.
+func (sheet Sheet) GetCells(r int, c int, args... string) (ret interface{} , err error) {
+    defer Except("Sheet.GetCells", &err)
     cell := oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()
-    defer Except("Sheet.Cells", &err, cell.Release)
-    if vals == nil {
-        ret = VARIANT{oleutil.MustGetProperty(cell, "Value")}.ToString()
+    defer NoExcept(cell.Release)
+    if args == nil {
+        ret = VARIANT{oleutil.MustGetProperty(cell, "Value")}.Value()
     } else {
-        oleutil.PutProperty(cell, "Value", vals[0])
+        ret = VARIANT{oleutil.MustGetProperty(cell, args[0])}.Value()
     }
     return
 }
 
-//Must get value as string/put
-func (sheet Sheet) MustCells(r int, c int, vals...interface{}) (ret string) {
+//Must get Property as interface.
+func (sheet Sheet) MustGetCells(r int, c int, args... string) (ret interface{}) {
+    ret, err := sheet.GetCells(r, c, args...)
+    if err != nil {
+        panic(err.Error())
+    }
+    return
+}
+
+//put Property.
+func (sheet Sheet) PutCells(r int, c int, args... interface{}) (err error) {
+    defer Except("Sheet.PutCells", &err)
+    cell := oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()
+    defer NoExcept(cell.Release)
+    num := len(args)
+    if num == 1 {
+        oleutil.MustPutProperty(cell, "Value", args[0])
+    } else if num > 1 {
+        oleutil.MustPutProperty(cell, args[0].(string), args[1])
+    }
+    return
+}
+
+//get value as string/put value.
+func (sheet Sheet) Cells(r int, c int, vals... interface{}) (ret string, err error) {
+    defer Except("Sheet.Cells", &err)
+    if vals == nil {
+        ret = fmt.Sprintf("%+v", sheet.MustGetCells(r, c))
+    } else {
+        err = sheet.PutCells(r, c, vals[0])
+    }
+    return
+}
+
+//Must get value as string/Must put value.
+func (sheet Sheet) MustCells(r int, c int, vals... interface{}) (ret string) {
     ret, err := sheet.Cells(r, c, vals...)
     if err != nil {
         panic(err.Error())
@@ -379,7 +402,7 @@ func (sheet Sheet) MustCells(r int, c int, vals...interface{}) (ret string) {
     return
 }
 
-//convert (5,27) to "AA5", xp+office2003 cant use cell(1,1)
+//convert (5,27) to "AA5", xp+office2003 cant use cell(1,1).
 func Cell2r(x, y int) (ret string) {
     for y>0 {
         a, b := int(y/26), y%26
@@ -398,7 +421,7 @@ func Except(info string, err *error, funcs... interface{}) {
     r := recover()
     if err != nil {
         if r != nil {
-            *err = errors.New(fmt.Sprintf("*"+info+": %+v", r))
+            *err = errors.New(fmt.Sprintf("@"+info+": %+v", r))
         } else if *err != nil {
             *err = errors.New("%"+info+"%"+(*err).Error())
         }
@@ -440,9 +463,6 @@ func RftCall(function reflect.Value, args... reflect.Value) (err error) {
     function.Call(args)
     return
 }
-
-
-
 
 
 

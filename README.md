@@ -22,7 +22,7 @@ import (
 )
 
 func main() {
-	option := excel.Option{Visible: true, ScreenUpdating: true, DisplayAlerts: true}
+	option := excel.Option{"Visible": true, "ScreenUpdating": true, "DisplayAlerts": true}
 	xl, _ := excel.New(option)      //xl := excel.Open("test_excel.xls", option)
 	defer xl.Quit()
 
