@@ -33,7 +33,7 @@ func main() {
 
 	cell := sheet.MustCell(5, 6)
     cell.Put("go")
-	cell.Put("font", map[string]interface{}{"name": "Times New Roman", "size": "26", "bold": true})
+	cell.Put("font", map[string]interface{}{"name": "Arial", "size": "26", "bold": true})
 	cell.Put("interior", map[string]interface{}{"colorindex": 6})
 
 	println("cell strings:", sheet.MustCells(2, 2), sheet.MustCells(2, 3))
