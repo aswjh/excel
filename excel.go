@@ -34,6 +34,10 @@ type Sheet struct {
     Idisp *ole.IDispatch
 }
 
+type Cell struct {
+    Idisp *ole.IDispatch
+}
+
 type VARIANT struct {
     *ole.VARIANT
 }
@@ -51,6 +55,8 @@ func (va VARIANT) Value() (val interface{}) {
             val =*((*float64)(unsafe.Pointer(&va.Val)))
         case 8:                     //string
             val = *((**uint16)(unsafe.Pointer(&va.Val)))
+        case 9:                     //*IDispatch
+            val = va
         case 11:
             val = *((*bool)(unsafe.Pointer(&va.Val)))
         case 16:
@@ -65,6 +71,8 @@ func (va VARIANT) Value() (val interface{}) {
             val = *((*int64)(unsafe.Pointer(&va.Val)))
         case 21:
             val = *((*uint64)(unsafe.Pointer(&va.Val)))
+        default:
+            val = va
     }
     return
 }
@@ -102,12 +110,14 @@ func String(val interface{}) (ret string) {
             } else {
                 ret = "false"
             }
+        case string:
+            ret = val.(string)
     }
     return
 }
 
 //
-func Init(options... Option) (mso *MSO) {
+func Initialize(options... Option) (mso *MSO) {
     ole.CoInitialize(0)
     app, _ := oleutil.CreateObject("Excel.Application")
     excel, _ := app.QueryInterface(ole.IID_IDispatch)
@@ -129,7 +139,7 @@ func Init(options... Option) (mso *MSO) {
 //
 func New(options... Option) (mso *MSO, err error){
     defer Except("New", &err)
-    mso = Init(options...)
+    mso = Initialize(options...)
     _, err = mso.AddWorkBook()
     return
 }
@@ -137,7 +147,7 @@ func New(options... Option) (mso *MSO, err error){
 //
 func Open(full string, options... Option) (mso *MSO, err error) {
     defer Except("Open", &err)
-    mso = Init(options...)
+    mso = Initialize(options...)
     _, err = mso.OpenWorkBook(full)
     return
 }
@@ -332,7 +342,7 @@ func (wb WorkBook) Activate() (err error) {
 
 //
 func (wb WorkBook) Name() (string) {
-    defer NoExcept()
+    defer Except("", nil)
     return oleutil.MustGetProperty(wb.Idisp, "Name").ToString()
 }
 
@@ -373,7 +383,7 @@ func (sheet Sheet) Delete() (err error) {
 
 //
 func (sheet Sheet) Name(args... string) (name string) {
-    defer NoExcept()
+    defer Except("", nil)
     if args == nil {
         name = oleutil.MustGetProperty(sheet.Idisp, "Name").ToString()
     } else {
@@ -383,61 +393,135 @@ func (sheet Sheet) Name(args... string) (name string) {
     return
 }
 
-//get Property as interface.
-func (sheet Sheet) GetCells(r int, c int, args... string) (ret interface{} , err error) {
-    defer Except("Sheet.GetCells", &err)
-    cell := oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()
-    defer NoExcept(cell.Release)
-    if args == nil {
-        ret = VARIANT{oleutil.MustGetProperty(cell, "Value")}.Value()
+//get cell Property as interface.
+func (sheet Sheet) GetCell(r int, c int, args... string) (ret interface{} , err error) {
+    defer Except("Sheet.GetCell", &err)
+    cell := sheet.MustCell(r, c)
+    defer MustFuncs(cell.Idisp.Release)
+    ret, err = cell.Get(args...)
+    return
+}
+
+//Must get cell Property as interface.
+func (sheet Sheet) MustGetCell(r int, c int, args... string) (ret interface{}) {
+    ret, err := sheet.GetCell(r, c, args...)
+    if err != nil {
+        panic(err.Error())
+    }
+    return
+}
+
+//put cell Property.
+func (sheet Sheet) PutCell(r int, c int, args... interface{}) (err error) {
+    defer Except("Sheet.PutCell", &err)
+    cell := sheet.MustCell(r, c)
+    defer MustFuncs(cell.Idisp.Release)
+    err = cell.Put(args...)
+    return
+}
+
+//get cell Property as string/put cell Property.
+func (sheet Sheet) Cells(r int, c int, vals... interface{}) (ret string, err error) {
+    defer Except("Sheet.Cells", &err)
+    if vals == nil {
+        ret = String(sheet.MustGetCell(r, c))
     } else {
-        ret = VARIANT{oleutil.MustGetProperty(cell, args[0])}.Value()
+        err = sheet.PutCell(r, c, vals[0])
+    }
+    return
+}
+
+//Must get cell Property as string/Must put cell Property.
+func (sheet Sheet) MustCells(r int, c int, vals... interface{}) (ret string) {
+    ret, err := sheet.Cells(r, c, vals...)
+    if err != nil {
+        panic(err.Error())
+    }
+    return
+}
+
+//get cell pointer.
+func (sheet Sheet) Cell(r int, c int) (cell Cell, err error) {
+    defer Except("Sheet.Cell", &err)
+    _cell, err := oleutil.GetProperty(sheet.Idisp, "Range", Cell2r(r, c))
+    cell = Cell{_cell.ToIDispatch()}
+    return
+}
+
+//Must get cell pointer.
+func (sheet Sheet) MustCell(r int, c int) (cell Cell) {
+    cell = Cell{oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()}
+    return
+}
+
+//get Property as interface.
+func (cell Cell) Get(args... string) (ret interface{}, err error) {
+    defer Except("Cell.Get", &err)
+    if args == nil {
+        ret = VARIANT{oleutil.MustGetProperty(cell.Idisp, "Value")}.Value()
+    } else {
+        idisp, maxi := cell.Idisp, len(args)-1
+        for i:=0; i<maxi&&err==nil; i++ {
+            idisp = oleutil.MustGetProperty(idisp, args[i]).ToIDispatch()
+            defer MustFuncs(idisp.Release)
+        }
+        //get multi-Property
+        if argv := args[maxi]; strings.IndexAny(argv, ",") != -1 {
+            sl := []string{}
+            for _, key := range strings.Split(argv, ",") {
+                sl = append(sl, key+":"+String(VARIANT{oleutil.MustGetProperty(idisp, key)}.Value()))
+            }
+            ret = strings.Join(sl, ", ")
+        } else {
+            ret = VARIANT{oleutil.MustGetProperty(idisp, argv)}.Value()
+        }
     }
     return
 }
 
 //Must get Property as interface.
-func (sheet Sheet) MustGetCells(r int, c int, args... string) (ret interface{}) {
-    ret, err := sheet.GetCells(r, c, args...)
+func (cell Cell) MustGet(args... string) (ret interface{}) {
+    ret, err := cell.Get(args...)
     if err != nil {
         panic(err.Error())
     }
     return
 }
 
-//put Property.
-func (sheet Sheet) PutCells(r int, c int, args... interface{}) (err error) {
-    defer Except("Sheet.PutCells", &err)
-    cell := oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()
-    defer NoExcept(cell.Release)
+//get Property as string.
+func (cell Cell) Gets(args... string) (ret string, err error) {
+    defer Except("Cell.Gets", &err)
+    ret = String(cell.MustGet(args...))
+    return
+}
+
+//Must get Property as string.
+func (cell Cell) MustGets(args... string) (ret string) {
+    return String(cell.MustGet(args...))
+}
+
+//put cell Property.
+func (cell Cell) Put(args... interface{}) (err error) {
+    defer Except("Cell.Put", &err)
     num := len(args)
-    if num == 1 {
-        oleutil.MustPutProperty(cell, "Value", args[0])
-    } else if num > 1 {
-        oleutil.MustPutProperty(cell, args[0].(string), args[1])
-    }
-    return
-}
-
-//get value as string/put value.
-func (sheet Sheet) Cells(r int, c int, vals... interface{}) (ret string, err error) {
-    defer Except("Sheet.Cells", &err)
-    if vals == nil {
-        v := sheet.MustGetCells(r, c)
-        if v != nil {
-            ret = String(v)
+    if num==1 {
+        oleutil.MustPutProperty(cell.Idisp, "Value", args[0])
+    } else if num>1 {
+        idisp, maxi := cell.Idisp, num-2
+        for i:=0; i<maxi&&err==nil; i++ {
+            idisp = oleutil.MustGetProperty(idisp, args[i].(string)).ToIDispatch()
+            defer MustFuncs(idisp.Release)
         }
-    } else {
-        err = sheet.PutCells(r, c, vals[0])
-    }
-    return
-}
-
-//Must get value as string/Must put value.
-func (sheet Sheet) MustCells(r int, c int, vals... interface{}) (ret string) {
-    ret, err := sheet.Cells(r, c, vals...)
-    if err != nil {
-        panic(err.Error())
+        //put multi-Property
+        if argv, ok := args[num-1].(map[string]interface{}); ok {
+            idisp = oleutil.MustGetProperty(idisp, args[maxi].(string)).ToIDispatch()
+            defer MustFuncs(idisp.Release)
+            for key, val := range argv {
+                oleutil.MustPutProperty(idisp, key, val)
+            }
+        } else {
+            oleutil.MustPutProperty(idisp, args[maxi].(string), argv)
+        }
     }
     return
 }
@@ -467,28 +551,27 @@ func Except(info string, err *error, funcs... interface{}) {
         }
     }
     if funcs != nil {
-        NoExcept(funcs...)
+        MustFuncs(funcs...)
     }
 }
 
 //
-func NoExcept(funcs... interface{}) {
-    recover()
+func MustFuncs(funcs... interface{}) {
     if funcs != nil {
-        prei, args := -1, []reflect.Value{}
-        for i, one := range funcs {
+        fx, args := reflect.Value{}, []reflect.Value{}
+        for _, one := range funcs {
             cur := reflect.ValueOf(one)
             if cur.Kind().String() == "func" {
-                if prei > -1 {
-                    RftCall(reflect.ValueOf(funcs[prei]), args...)
+                if fx.IsValid() {
+                    RftCall(fx, args...)
                 }
-                prei, args = i, []reflect.Value{}
+                fx, args = cur, []reflect.Value{}
             } else {
                 args = append(args, cur)
             }
         }
-        if prei > -1 {
-            RftCall(reflect.ValueOf(funcs[prei]), args...)
+        if fx.IsValid() {
+            RftCall(fx, args...)
         }
     }
 }
@@ -503,6 +586,10 @@ func RftCall(function reflect.Value, args... reflect.Value) (err error) {
     function.Call(args)
     return
 }
+
+
+
+
 
 
 

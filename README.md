@@ -31,6 +31,11 @@ func main() {
 		sheet.MustCells(2, i, 1000+i)
 	}
 
+	cell := sheet.MustCell(5, 6)
+    cell.Put("go")
+	cell.Put("font", map[string]interface{}{"name": "Times New Roman", "size": "26", "bold": true})
+	cell.Put("interior", map[string]interface{}{"colorindex": 6})
+
 	println("cell strings:", sheet.MustCells(2, 2), sheet.MustCells(2, 3))
 	time.Sleep(3000000000)
 
@@ -45,4 +50,5 @@ The [BSD 3-Clause license][bsd]
 
 [ole]: http://github.com/mattn/go-ole
 [bsd]: http://opensource.org/licenses/BSD-3-Clause
+
 
