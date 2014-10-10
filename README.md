@@ -30,15 +30,14 @@ func main() {
 	for i:=2; i<=6; i++ {
 		sheet.MustCells(2, i, 1000+i)
 	}
+	println("cell strings:", sheet.MustCells(2, 2), sheet.MustCells(2, 3))
 
 	cell := sheet.MustCell(5, 6)
     cell.Put("go")
-	cell.Put("font", map[string]interface{}{"name": "Arial", "size": "26", "bold": true})
-	cell.Put("interior", map[string]interface{}{"colorindex": 6})
+	cell.Put("font", map[string]interface{}{"name": "Arial", "size": 26, "bold": true})
+	cell.Put("interior", "colorindex", 6)
 
-	println("cell strings:", sheet.MustCells(2, 2), sheet.MustCells(2, 3))
 	time.Sleep(3000000000)
-
 	xl.SaveAs("test_excel.xls")
 }
 
@@ -50,5 +49,7 @@ The [BSD 3-Clause license][bsd]
 
 [ole]: http://github.com/mattn/go-ole
 [bsd]: http://opensource.org/licenses/BSD-3-Clause
+
+
 
 

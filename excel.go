@@ -34,6 +34,10 @@ type Sheet struct {
     Idisp *ole.IDispatch
 }
 
+type Range struct {
+    Idisp *ole.IDispatch
+}
+
 type Cell struct {
     Idisp *ole.IDispatch
 }
@@ -191,9 +195,9 @@ func (mso *MSO) SetOption(args... interface{}) (err error) {
         }
         for key, val := range curs {
             if isinit {
-                oleutil.PutProperty(mso.IdExcel, key, val)
+                _, err = oleutil.PutProperty(mso.IdExcel, key, val)
             } else if opt, ok := opts[key]; ! ok || val != opt {
-                oleutil.PutProperty(mso.IdExcel, key, val)
+                _, err = oleutil.PutProperty(mso.IdExcel, key, val)
                 opts[key] = val
             }
         }
@@ -397,7 +401,7 @@ func (sheet Sheet) Name(args... string) (name string) {
 func (sheet Sheet) GetCell(r int, c int, args... string) (ret interface{} , err error) {
     defer Except("Sheet.GetCell", &err)
     cell := sheet.MustCell(r, c)
-    defer MustFuncs(cell.Idisp.Release)
+    defer DoFuncs(cell.Idisp.Release)
     ret, err = cell.Get(args...)
     return
 }
@@ -415,7 +419,7 @@ func (sheet Sheet) MustGetCell(r int, c int, args... string) (ret interface{}) {
 func (sheet Sheet) PutCell(r int, c int, args... interface{}) (err error) {
     defer Except("Sheet.PutCell", &err)
     cell := sheet.MustCell(r, c)
-    defer MustFuncs(cell.Idisp.Release)
+    defer DoFuncs(cell.Idisp.Release)
     err = cell.Put(args...)
     return
 }
@@ -454,28 +458,29 @@ func (sheet Sheet) MustCell(r int, c int) (cell Cell) {
     return
 }
 
+//get range pointer.
+func (sheet Sheet) Range(rang string) (Range) {
+    return Range{oleutil.MustGetProperty(sheet.Idisp, "Range", rang).ToIDispatch()}
+}
+
+//put range Property.
+func (sheet Sheet) PutRange(rang string, args... interface{}) (err error) {
+    defer Except("Sheet.PutRange", &err)
+    ran := sheet.Range(rang)
+    defer DoFuncs(ran.Idisp.Release)
+    err = ran.Put(args...)
+    return
+}
+
+//put range Property.
+func (ran Range) Put(args... interface{}) (error) {
+    return PutProperty(ran.Idisp, args...)
+}
+
 //get Property as interface.
 func (cell Cell) Get(args... string) (ret interface{}, err error) {
     defer Except("Cell.Get", &err)
-    if args == nil {
-        ret = VARIANT{oleutil.MustGetProperty(cell.Idisp, "Value")}.Value()
-    } else {
-        idisp, maxi := cell.Idisp, len(args)-1
-        for i:=0; i<maxi&&err==nil; i++ {
-            idisp = oleutil.MustGetProperty(idisp, args[i]).ToIDispatch()
-            defer MustFuncs(idisp.Release)
-        }
-        //get multi-Property
-        if argv := args[maxi]; strings.IndexAny(argv, ",") != -1 {
-            sl := []string{}
-            for _, key := range strings.Split(argv, ",") {
-                sl = append(sl, key+":"+String(VARIANT{oleutil.MustGetProperty(idisp, key)}.Value()))
-            }
-            ret = strings.Join(sl, ", ")
-        } else {
-            ret = VARIANT{oleutil.MustGetProperty(idisp, argv)}.Value()
-        }
-    }
+    ret, err = GetProperty(cell.Idisp, args...)
     return
 }
 
@@ -501,27 +506,60 @@ func (cell Cell) MustGets(args... string) (ret string) {
 }
 
 //put cell Property.
-func (cell Cell) Put(args... interface{}) (err error) {
-    defer Except("Cell.Put", &err)
+func (cell Cell) Put(args... interface{}) (error) {
+    return PutProperty(cell.Idisp, args...)
+}
+
+//get Property as interface.
+func GetProperty(idisp *ole.IDispatch, args... string) (ret interface{}, err error) {
+    defer Except("GetProperty", &err)
+    if args == nil {
+        ret = VARIANT{oleutil.MustGetProperty(idisp, "Value")}.Value()
+    } else {
+        maxi := len(args)-1
+        for i:=0; i<maxi&&err==nil; i++ {
+            idisp = oleutil.MustGetProperty(idisp, args[i]).ToIDispatch()
+            defer DoFuncs(idisp.Release)
+        }
+        //get multi-Property
+        argv := args[maxi]
+        if strings.IndexAny(argv, ",") != -1 {
+            sl := []string{}
+            for _, key := range strings.Split(argv, ",") {
+                sl = append(sl, key+":"+String(VARIANT{oleutil.MustGetProperty(idisp, key)}.Value()))
+            }
+            ret = strings.Join(sl, ", ")
+        } else {
+            ret = VARIANT{oleutil.MustGetProperty(idisp, argv)}.Value()
+        }
+    }
+    return
+}
+
+////put Property.
+func PutProperty(idisp *ole.IDispatch, args... interface{}) (err error) {
+    defer Except("PutProperty", &err)
     num := len(args)
     if num==1 {
-        oleutil.MustPutProperty(cell.Idisp, "Value", args[0])
+        oleutil.MustPutProperty(idisp, "Value", args[0])
     } else if num>1 {
-        idisp, maxi := cell.Idisp, num-2
+        maxi := num-2
         for i:=0; i<maxi&&err==nil; i++ {
             idisp = oleutil.MustGetProperty(idisp, args[i].(string)).ToIDispatch()
-            defer MustFuncs(idisp.Release)
+            defer DoFuncs(idisp.Release)
         }
         //put multi-Property
         if argv, ok := args[num-1].(map[string]interface{}); ok {
             idisp = oleutil.MustGetProperty(idisp, args[maxi].(string)).ToIDispatch()
-            defer MustFuncs(idisp.Release)
+            defer DoFuncs(idisp.Release)
             for key, val := range argv {
                 oleutil.MustPutProperty(idisp, key, val)
             }
         } else {
-            oleutil.MustPutProperty(idisp, args[maxi].(string), argv)
+            oleutil.MustPutProperty(idisp, args[maxi].(string), args[num-1])
         }
+    } else {
+        err = errors.New("args is empty")
     }
     return
 }
@@ -551,12 +589,12 @@ func Except(info string, err *error, funcs... interface{}) {
         }
     }
     if funcs != nil {
-        MustFuncs(funcs...)
+        DoFuncs(funcs...)
     }
 }
 
 //
-func MustFuncs(funcs... interface{}) {
+func DoFuncs(funcs... interface{}) {
     if funcs != nil {
         fx, args := reflect.Value{}, []reflect.Value{}
         for _, one := range funcs {
@@ -586,11 +624,6 @@ func RftCall(function reflect.Value, args... reflect.Value) (err error) {
     function.Call(args)
     return
 }
-
-
-
-
-
 
 
 
