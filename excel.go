@@ -360,6 +360,20 @@ func (wb WorkBook) Save() (err error) {
 //
 func (wb WorkBook) SaveAs(args... interface{}) (err error) {
     defer Except("WorkBook.SaveAs", &err)
+    if len(args)>1 {
+        switch args[1].(type) {
+            case string:
+                fn, ffs := args[0].(string), strings.ToLower(args[1].(string))
+                if filepath.Ext(fn) == "" {
+                    args[0] = fn+"."+ffs
+                }
+                if n, ok := wb.FILEFORMAT[ffs]; ok {
+                    args[1] = n
+                } else {
+                    args[1] = 0
+                }
+        }
+    }
     _, err = oleutil.CallMethod(wb.Idisp, "SaveAs", args...)
     return
 }
@@ -447,14 +461,16 @@ func (sheet Sheet) MustCells(r int, c int, vals... interface{}) (ret string) {
 //get cell pointer.
 func (sheet Sheet) Cell(r int, c int) (cell Cell, err error) {
     defer Except("Sheet.Cell", &err)
-    _cell, err := oleutil.GetProperty(sheet.Idisp, "Range", Cell2r(r, c))
+    //_cell, err := oleutil.GetProperty(sheet.Idisp, "Range", Cell2r(r, c))
+    _cell, err := oleutil.GetProperty(sheet.Idisp, "Cells", r, c)
     cell = Cell{_cell.ToIDispatch()}
     return
 }
 
 //Must get cell pointer.
 func (sheet Sheet) MustCell(r int, c int) (cell Cell) {
-    cell = Cell{oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()}
+    //cell = Cell{oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()}
+    cell = Cell{oleutil.MustGetProperty(sheet.Idisp, "Cells", r, c).ToIDispatch()}
     return
 }
 
@@ -536,7 +552,7 @@ func GetProperty(idisp *ole.IDispatch, args... string) (ret interface{}, err err
     return
 }
 
-////put Property.
+//put Property.
 func PutProperty(idisp *ole.IDispatch, args... interface{}) (err error) {
     defer Except("PutProperty", &err)
     num := len(args)

@@ -38,7 +38,7 @@ func main() {
 	cell.Put("interior", "colorindex", 6)
 
 	time.Sleep(3000000000)
-	xl.SaveAs("test_excel.xls")
+	xl.SaveAs("test_excel.xls")      //xl.SaveAs("test_excel", "html")
 }
 
 ```
