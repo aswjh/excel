@@ -46,112 +46,37 @@ type VARIANT struct {
     *ole.VARIANT
 }
 
-//get val of MS VARIANT
-func (va VARIANT) Value() (val interface{}) {
-    switch va.VT {
-        case 2:
-            val = *((*int16)(unsafe.Pointer(&va.Val)))
-        case 3:
-            val = *((*int32)(unsafe.Pointer(&va.Val)))
-        case 4:
-            val = *((*float32)(unsafe.Pointer(&va.Val)))
-        case 5:
-            val =*((*float64)(unsafe.Pointer(&va.Val)))
-        case 8:                     //string
-            val = *((**uint16)(unsafe.Pointer(&va.Val)))
-        case 9:                     //*IDispatch
-            val = va
-        case 11:
-            val = *((*bool)(unsafe.Pointer(&va.Val)))
-        case 16:
-            val = *((*int8)(unsafe.Pointer(&va.Val)))
-        case 17:
-            val = *((*uint8)(unsafe.Pointer(&va.Val)))
-        case 18:
-            val = *((*uint16)(unsafe.Pointer(&va.Val)))
-        case 19:
-            val = *((*uint32)(unsafe.Pointer(&va.Val)))
-        case 20:
-            val = *((*int64)(unsafe.Pointer(&va.Val)))
-        case 21:
-            val = *((*uint64)(unsafe.Pointer(&va.Val)))
-        default:
-            val = va
-    }
-    return
-}
-
 //
-func String(val interface{}) (ret string) {
-    switch val.(type) {
-        case int:
-            ret = strconv.FormatInt(int64(val.(int)), 10)
-        case int8:
-            ret = strconv.FormatInt(int64(val.(int8)), 10)
-        case int16:
-            ret = strconv.FormatInt(int64(val.(int16)), 10)
-        case int32:
-            ret = strconv.FormatInt(int64(val.(int32)), 10)
-        case int64:
-            ret = strconv.FormatInt(val.(int64), 10)
-        case float32:
-            ret = strconv.FormatFloat(float64(val.(float32)), 'f', 2, 64)
-        case float64:
-            ret = strconv.FormatFloat(val.(float64), 'f', 2, 64)
-        case uint8:
-            ret = strconv.FormatUint(uint64(val.(uint8)), 10)
-        case uint16:
-            ret = strconv.FormatUint(uint64(val.(uint16)), 10)
-        case uint32:
-            ret = strconv.FormatUint(uint64(val.(uint32)), 10)
-        case uint64:
-            ret = strconv.FormatUint(val.(uint64), 10)
-        case *uint16:                     //string
-            ret = ole.UTF16PtrToString(val.(*uint16))
-        case bool:
-            if val.(bool) {
-                ret = "true"
-            } else {
-                ret = "false"
-            }
-        case string:
-            ret = val.(string)
-    }
-    return
-}
-
-//
-func Initialize(options... Option) (mso *MSO) {
+func Initialize(opt... Option) (mso *MSO) {
     ole.CoInitialize(0)
     app, _ := oleutil.CreateObject("Excel.Application")
     excel, _ := app.QueryInterface(ole.IID_IDispatch)
     wbs := oleutil.MustGetProperty(excel, "WorkBooks").ToIDispatch()
     ver, _ := strconv.ParseFloat(oleutil.MustGetProperty(excel, "Version").ToString(), 64)
 
-    option := Option{"Visible": true, "DisplayAlerts": true, "ScreenUpdating": true}
-    if options != nil {
-        option = options[0]
+    if opt == nil {
+        opt = []Option {{"Visible": true, "DisplayAlerts": true, "ScreenUpdating": true}}
     }
-    mso = &MSO{Option:option, IuApp:app, IdExcel:excel, IdWorkBooks:wbs, Version:ver}
-    mso.SetOption(option, 1)
+    mso = &MSO{Option:opt[0], IuApp:app, IdExcel:excel, IdWorkBooks:wbs, Version:ver}
+    mso.SetOption(1)
 
     //XlFileFormat Enumeration: http://msdn.microsoft.com/en-us/library/office/ff198017%28v=office.15%29.aspx
-    mso.FILEFORMAT = map[string]int {"txt":-4158, "csv":6, "html":44, "xlsx":51, "xls":56}
+    mso.FILEFORMAT = map[string]int {"txt":-4158, "csv":6, "html":44}
     return
 }
 
 //
-func New(options... Option) (mso *MSO, err error){
+func New(opt... Option) (mso *MSO, err error){
     defer Except("New", &err)
-    mso = Initialize(options...)
+    mso = Initialize(opt...)
     _, err = mso.AddWorkBook()
     return
 }
 
 //
-func Open(full string, options... Option) (mso *MSO, err error) {
+func Open(full string, opt... Option) (mso *MSO, err error) {
     defer Except("Open", &err)
-    mso = Initialize(options...)
+    mso = Initialize(opt...)
     _, err = mso.OpenWorkBook(full)
     return
 }
@@ -185,21 +110,28 @@ func (mso *MSO) Quit() (err error) {
 //
 func (mso *MSO) SetOption(args... interface{}) (err error) {
     defer Except("SetOption", &err)
+    ops, curs, isinit := mso.Option, Option{}, false
     leng := len(args)
-    if leng>0 {
-        opts, curs, isinit := mso.Option, Option{}, false
-        if options, ok := args[0].(Option); ok {
-            curs, isinit = options, leng==2 && args[1].(int) > 0
-        } else if key, ok := args[0].(string); ok {
+    if leng==1 {
+        switch args[0].(type) {
+            case int:
+                if args[0].(int)>0 {
+                    curs, isinit = ops, true
+                }
+            case Option:
+                curs = args[0].(Option)
+        }
+    } else if leng==2 {
+        if key, ok := args[0].(string); ok {
             curs[key] = args[1]
         }
-        for key, val := range curs {
-            if isinit {
-                _, err = oleutil.PutProperty(mso.IdExcel, key, val)
-            } else if opt, ok := opts[key]; ! ok || val != opt {
-                _, err = oleutil.PutProperty(mso.IdExcel, key, val)
-                opts[key] = val
-            }
+    }
+    for key, val := range curs {
+        if isinit {
+            _, err = oleutil.PutProperty(mso.IdExcel, key, val)
+        } else if one, ok := ops[key]; ! ok || val != one {
+            _, err = oleutil.PutProperty(mso.IdExcel, key, val)
+            ops[key] = val
         }
     }
     return
@@ -363,14 +295,15 @@ func (wb WorkBook) SaveAs(args... interface{}) (err error) {
     if len(args)>1 {
         switch args[1].(type) {
             case string:
-                fn, ffs := args[0].(string), strings.ToLower(args[1].(string))
-                if filepath.Ext(fn) == "" {
-                    args[0] = fn+"."+ffs
-                }
+                ffs := strings.ToLower(args[1].(string))
                 if n, ok := wb.FILEFORMAT[ffs]; ok {
+                    fn := args[0].(string)
+                    if ! strings.HasSuffix(fn, "."+ffs) {
+                        args[0] = fn+"."+ffs
+                    }
                     args[1] = n
                 } else {
-                    args[1] = 0
+                    args[1] = nil
                 }
         }
     }
@@ -461,7 +394,6 @@ func (sheet Sheet) MustCells(r int, c int, vals... interface{}) (ret string) {
 //get cell pointer.
 func (sheet Sheet) Cell(r int, c int) (cell Cell, err error) {
     defer Except("Sheet.Cell", &err)
-    //_cell, err := oleutil.GetProperty(sheet.Idisp, "Range", Cell2r(r, c))
     _cell, err := oleutil.GetProperty(sheet.Idisp, "Cells", r, c)
     cell = Cell{_cell.ToIDispatch()}
     return
@@ -469,7 +401,6 @@ func (sheet Sheet) Cell(r int, c int) (cell Cell, err error) {
 
 //Must get cell pointer.
 func (sheet Sheet) MustCell(r int, c int) (cell Cell) {
-    //cell = Cell{oleutil.MustGetProperty(sheet.Idisp, "Range", Cell2r(r, c)).ToIDispatch()}
     cell = Cell{oleutil.MustGetProperty(sheet.Idisp, "Cells", r, c).ToIDispatch()}
     return
 }
@@ -580,18 +511,78 @@ func PutProperty(idisp *ole.IDispatch, args... interface{}) (err error) {
     return
 }
 
-//convert (5,27) to "AA5", xp+office2003 cant use cell(1,1).
-func Cell2r(x, y int) (ret string) {
-    for y>0 {
-        a, b := int(y/26), y%26
-        if b==0 {
-            a-=1
-            b=26
-        }
-        ret = string(rune(b+64))+ret
-        y = a
+//get val of MS VARIANT
+func (va VARIANT) Value() (val interface{}) {
+    switch va.VT {
+        case 2:
+            val = *((*int16)(unsafe.Pointer(&va.Val)))
+        case 3:
+            val = *((*int32)(unsafe.Pointer(&va.Val)))
+        case 4:
+            val = *((*float32)(unsafe.Pointer(&va.Val)))
+        case 5:
+            val =*((*float64)(unsafe.Pointer(&va.Val)))
+        case 8:                     //string
+            val = *((**uint16)(unsafe.Pointer(&va.Val)))
+        case 9:                     //*IDispatch
+            val = va
+        case 11:
+            val = *((*bool)(unsafe.Pointer(&va.Val)))
+        case 16:
+            val = *((*int8)(unsafe.Pointer(&va.Val)))
+        case 17:
+            val = *((*uint8)(unsafe.Pointer(&va.Val)))
+        case 18:
+            val = *((*uint16)(unsafe.Pointer(&va.Val)))
+        case 19:
+            val = *((*uint32)(unsafe.Pointer(&va.Val)))
+        case 20:
+            val = *((*int64)(unsafe.Pointer(&va.Val)))
+        case 21:
+            val = *((*uint64)(unsafe.Pointer(&va.Val)))
+        default:
+            val = va
     }
-    return ret+strconv.Itoa(x)
+    return
+}
+
+//
+func String(val interface{}) (ret string) {
+    switch val.(type) {
+        case int:
+            ret = strconv.FormatInt(int64(val.(int)), 10)
+        case int8:
+            ret = strconv.FormatInt(int64(val.(int8)), 10)
+        case int16:
+            ret = strconv.FormatInt(int64(val.(int16)), 10)
+        case int32:
+            ret = strconv.FormatInt(int64(val.(int32)), 10)
+        case int64:
+            ret = strconv.FormatInt(val.(int64), 10)
+        case float32:
+            ret = strconv.FormatFloat(float64(val.(float32)), 'f', 2, 64)
+        case float64:
+            ret = strconv.FormatFloat(val.(float64), 'f', 2, 64)
+        case uint8:
+            ret = strconv.FormatUint(uint64(val.(uint8)), 10)
+        case uint16:
+            ret = strconv.FormatUint(uint64(val.(uint16)), 10)
+        case uint32:
+            ret = strconv.FormatUint(uint64(val.(uint32)), 10)
+        case uint64:
+            ret = strconv.FormatUint(val.(uint64), 10)
+        case *uint16:                     //string
+            ret = ole.UTF16PtrToString(val.(*uint16))
+        case bool:
+            if val.(bool) {
+                ret = "true"
+            } else {
+                ret = "false"
+            }
+        case string:
+            ret = val.(string)
+    }
+    return
 }
 
 //
