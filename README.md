@@ -27,10 +27,11 @@ func main() {
 	defer xl.Quit()
 
 	sheet, _ := xl.Sheet(1)         //xl.Sheet("sheet1")
-	for i:=2; i<=6; i++ {
-		sheet.MustCells(2, i, 1000+i)
-	}
-	println("cell strings:", sheet.MustCells(2, 2), sheet.MustCells(2, 3))
+    sheet.PutCell(1, 1, "hello")
+    sheet.Cells(1, 2, 2006)
+    sheet.MustCells(1, 3, 3.14159)
+    sheet.Range("a3:f3").Put("#")
+	println(sheet.MustCells(1, 1), sheet.MustCells(1, 2), excel.String(sheet.MustGetCell(1, 3)))
 
 	cell := sheet.MustCell(5, 6)
     cell.Put("go")
@@ -38,7 +39,7 @@ func main() {
 	cell.Put("interior", "colorindex", 6)
 
 	time.Sleep(3000000000)
-	xl.SaveAs("test_excel.xls")      //xl.SaveAs("test_excel", "html")
+	xl.SaveAs("test_excel.xls")    //xl.SaveAs("test_excel", "html")
 }
 
 ```
