@@ -31,7 +31,7 @@ func main() {
     sheet.Cells(1, 2, 2006)
     sheet.MustCells(1, 3, 3.14159)
     sheet.Range("a3:f3").Put("#")
-	println(sheet.MustCells(1, 1), sheet.MustCells(1, 2), excel.String(sheet.MustGetCell(1, 3)))
+	println(sheet.MustCells(1, 2), excel.String(sheet.MustGetCell(1, 3)))
 
 	cell := sheet.MustCell(5, 6)
     cell.Put("go")
