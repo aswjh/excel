@@ -27,16 +27,18 @@ func main() {
 	defer xl.Quit()
 
 	sheet, _ := xl.Sheet(1)         //xl.Sheet("sheet1")
-    sheet.PutCell(1, 1, "hello")
-    sheet.Cells(1, 2, 2006)
-    sheet.MustCells(1, 3, 3.14159)
-    sheet.Range("a3:f3").Put("#")
+	sheet.Cells(1, 1, "hello")
+	sheet.PutCell(1, 2, 2006)
+	sheet.MustCells(1, 3, 3.14159)
 	println(sheet.MustCells(1, 2), excel.String(sheet.MustGetCell(1, 3)))
 
 	cell := sheet.MustCell(5, 6)
-    cell.Put("go")
+	cell.Put("go")
 	cell.Put("font", map[string]interface{}{"name": "Arial", "size": 26, "bold": true})
 	cell.Put("interior", "colorindex", 6)
+
+	sheet.PutRange("a3:c3", "@")
+	sheet.Range("d3:f3").Put("#")
 
 	time.Sleep(3000000000)
 	xl.SaveAs("test_excel.xls")    //xl.SaveAs("test_excel", "html")

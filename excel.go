@@ -560,9 +560,9 @@ func String(val interface{}) (ret string) {
         case int64:
             ret = strconv.FormatInt(val.(int64), 10)
         case float32:
-            ret = strconv.FormatFloat(float64(val.(float32)), 'f', 2, 64)
+            ret = strconv.FormatFloat(float64(val.(float32)), 'f', 3, 64)
         case float64:
-            ret = strconv.FormatFloat(val.(float64), 'f', 2, 64)
+            ret = strconv.FormatFloat(val.(float64), 'f', 3, 64)
         case uint8:
             ret = strconv.FormatUint(uint64(val.(uint8)), 10)
         case uint16:
