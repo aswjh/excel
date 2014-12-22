@@ -30,7 +30,7 @@ func main() {
 	sheet.Cells(1, 1, "hello")
 	sheet.PutCell(1, 2, 2006)
 	sheet.MustCells(1, 3, 3.14159)
-	println(sheet.MustCells(1, 2), excel.String(sheet.MustGetCell(1, 3)))
+	println("str:"+sheet.MustCells(1, 2), sheet.MustGetCell(1, 2).(float64))
 
 	cell := sheet.MustCell(5, 6)
 	cell.Put("go")

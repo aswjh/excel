@@ -371,7 +371,7 @@ func (sheet Sheet) PutCell(r int, c int, args... interface{}) (err error) {
     return
 }
 
-//get cell Property as string/put cell Property.
+//get cell Property as string, put cell Property.
 func (sheet Sheet) Cells(r int, c int, vals... interface{}) (ret string, err error) {
     defer Except("Sheet.Cells", &err)
     if vals == nil {
@@ -382,7 +382,7 @@ func (sheet Sheet) Cells(r int, c int, vals... interface{}) (ret string, err err
     return
 }
 
-//Must get cell Property as string/Must put cell Property.
+//Must get cell Property as string, Must put cell Property.
 func (sheet Sheet) MustCells(r int, c int, vals... interface{}) (ret string) {
     ret, err := sheet.Cells(r, c, vals...)
     if err != nil {
@@ -523,7 +523,8 @@ func (va VARIANT) Value() (val interface{}) {
         case 5:
             val =*((*float64)(unsafe.Pointer(&va.Val)))
         case 8:                     //string
-            val = *((**uint16)(unsafe.Pointer(&va.Val)))
+            _val := *((**uint16)(unsafe.Pointer(&va.Val)))
+            val = ole.UTF16PtrToString(_val)
         case 9:                     //*IDispatch
             val = va
         case 11:
