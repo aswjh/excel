@@ -514,6 +514,10 @@ func PutProperty(idisp *ole.IDispatch, args... interface{}) (err error) {
 //get val of MS VARIANT
 func (va VARIANT) Value() (val interface{}) {
     switch va.VT {
+        case 0:                   //VT_EMPTY
+            val = ""
+        case 1:                   //VT_NULL
+            val = "VT_NULL"
         case 2:
             val = *((*int16)(unsafe.Pointer(&va.Val)))
         case 3:
@@ -521,12 +525,16 @@ func (va VARIANT) Value() (val interface{}) {
         case 4:
             val = *((*float32)(unsafe.Pointer(&va.Val)))
         case 5:
-            val =*((*float64)(unsafe.Pointer(&va.Val)))
+            val = *((*float64)(unsafe.Pointer(&va.Val)))
+        case 7:                    //VT_DATE
+            val = "VT_DATE"
         case 8:                     //string
             _val := *((**uint16)(unsafe.Pointer(&va.Val)))
             val = ole.UTF16PtrToString(_val)
         case 9:                     //*IDispatch
             val = va
+        case 10:                   //VT_ERROR
+            val = "VT_ERROR"
         case 11:
             val = *((*bool)(unsafe.Pointer(&va.Val)))
         case 16:
