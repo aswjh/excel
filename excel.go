@@ -1,6 +1,7 @@
 package excel
 
 import (
+    "time"
     "strconv"
     "strings"
     "path/filepath"
@@ -514,10 +515,10 @@ func PutProperty(idisp *ole.IDispatch, args... interface{}) (err error) {
 //get val of MS VARIANT
 func (va VARIANT) Value() (val interface{}) {
     switch va.VT {
-        case 0:                   //VT_EMPTY
+        case 0:               //VT_EMPTY
             val = ""
-        case 1:                   //VT_NULL
-            val = "VT_NULL"
+        case 1:               //VT_NULL
+            val = ""
         case 2:
             val = *((*int16)(unsafe.Pointer(&va.Val)))
         case 3:
@@ -526,15 +527,16 @@ func (va VARIANT) Value() (val interface{}) {
             val = *((*float32)(unsafe.Pointer(&va.Val)))
         case 5:
             val = *((*float64)(unsafe.Pointer(&va.Val)))
-        case 7:                    //VT_DATE
-            val = "VT_DATE"
-        case 8:                     //string
-            _val := *((**uint16)(unsafe.Pointer(&va.Val)))
-            val = ole.UTF16PtrToString(_val)
-        case 9:                     //*IDispatch
+        case 7:               //VT_DATE. Unix(second):1970-1-1. excel(day):1900-1-1. 19 for leap year. 0.5 for round.
+            _val7 := *((*float64)(unsafe.Pointer(&va.Val)))
+            val = time.Unix(int64((_val7-70*365-19)*24*3600+0.5), 0).Format("2006-01-02 15:04:05")
+        case 8:               //string
+            _val8 := *((**uint16)(unsafe.Pointer(&va.Val)))
+            val = ole.UTF16PtrToString(_val8)
+        case 9:               //*IDispatch
             val = va
-        case 10:                   //VT_ERROR
-            val = "VT_ERROR"
+        case 10:             //VT_ERROR
+            val = "#VT_ERROR"
         case 11:
             val = *((*bool)(unsafe.Pointer(&va.Val)))
         case 16:
