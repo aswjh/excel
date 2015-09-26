@@ -6,7 +6,7 @@ go语言读写excel文件.
 
 #dependency
 
-[github.com/mattn/go-ole][ole]
+[github.com/go-ole/go-ole][ole]
 
 #install
 
@@ -50,7 +50,7 @@ func main() {
 
 The [BSD 3-Clause license][bsd]
 
-[ole]: http://github.com/mattn/go-ole
+[ole]: http://github.com/go-ole/go-ole
 [bsd]: http://opensource.org/licenses/BSD-3-Clause
 
 

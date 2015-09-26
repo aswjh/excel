@@ -9,8 +9,8 @@ import (
     "reflect"
     "errors"
     "fmt"
-    "github.com/mattn/go-ole"
-    "github.com/mattn/go-ole/oleutil"
+    "github.com/go-ole/go-ole"
+    "github.com/go-ole/go-ole/oleutil"
 )
 
 type Option map[string]interface{}
@@ -535,7 +535,7 @@ func (va VARIANT) Value() (val interface{}) {
             val = ole.UTF16PtrToString(_val8)
         case 9:               //*IDispatch
             val = va
-        case 10:             //VT_ERROR
+        case 10:              //VT_ERROR
             val = "#VT_ERROR"
         case 11:
             val = *((*bool)(unsafe.Pointer(&va.Val)))
