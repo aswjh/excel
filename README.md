@@ -23,7 +23,7 @@ import (
 
 func main() {
 	option := excel.Option{"Visible": true, "DisplayAlerts": true}
-	xl, _ := excel.New(option)      //xl := excel.Open("test_excel.xls", option)
+	xl, _ := excel.New(option)      //xl, _ := excel.Open("test_excel.xls", option)
 	defer xl.Quit()
 
 	sheet, _ := xl.Sheet(1)         //xl.Sheet("sheet1")
@@ -37,8 +37,8 @@ func main() {
 	cell.Put("font", map[string]interface{}{"name": "Arial", "size": 26, "bold": true})
 	cell.Put("interior", "colorindex", 6)
 
-	sheet.PutRange("a3:c3", "@")
-	sheet.Range("d3:f3").Put("#")
+	sheet.PutRange("a3:c3", []string {"@1", "@2", "@3"})
+	sheet.Range("d3:f3").Put([]string {"~4", "~5", "~6"})
 
 	time.Sleep(3000000000)
 	xl.SaveAs("test_excel.xls")    //xl.SaveAs("test_excel", "html")

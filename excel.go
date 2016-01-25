@@ -55,7 +55,7 @@ func Initialize(opt... Option) (mso *MSO) {
     wbs := oleutil.MustGetProperty(excel, "WorkBooks").ToIDispatch()
     ver, _ := strconv.ParseFloat(oleutil.MustGetProperty(excel, "Version").ToString(), 64)
 
-    if opt == nil {
+    if len(opt) == 0 {
         opt = []Option {{"Visible": true, "DisplayAlerts": true, "ScreenUpdating": true}}
     }
     mso = &MSO{Option:opt[0], IuApp:app, IdExcel:excel, IdWorkBooks:wbs, Version:ver}
@@ -336,7 +336,7 @@ func (sheet Sheet) Delete() (err error) {
 //
 func (sheet Sheet) Name(args... string) (name string) {
     defer Except("", nil)
-    if args == nil {
+    if len(args) == 0 {
         name = oleutil.MustGetProperty(sheet.Idisp, "Name").ToString()
     } else {
         name = args[0]
@@ -375,7 +375,7 @@ func (sheet Sheet) PutCell(r int, c int, args... interface{}) (err error) {
 //get cell Property as string, put cell Property.
 func (sheet Sheet) Cells(r int, c int, vals... interface{}) (ret string, err error) {
     defer Except("Sheet.Cells", &err)
-    if vals == nil {
+    if len(vals) == 0 {
         ret = String(sheet.MustGetCell(r, c))
     } else {
         err = sheet.PutCell(r, c, vals[0])
@@ -425,6 +425,13 @@ func (ran Range) Put(args... interface{}) (error) {
     return PutProperty(ran.Idisp, args...)
 }
 
+//get range Property as interface.
+func (ran Range) Get(args... string) (ret interface{}, err error) {
+    defer Except("Range.Get", &err)
+    ret, err = GetProperty(ran.Idisp, args...)
+    return
+}
+
 //get Property as interface.
 func (cell Cell) Get(args... string) (ret interface{}, err error) {
     defer Except("Cell.Get", &err)
@@ -461,11 +468,12 @@ func (cell Cell) Put(args... interface{}) (error) {
 //get Property as interface.
 func GetProperty(idisp *ole.IDispatch, args... string) (ret interface{}, err error) {
     defer Except("GetProperty", &err)
-    if args == nil {
+    argnum := len(args)
+    if argnum==0 {
         ret = VARIANT{oleutil.MustGetProperty(idisp, "Value")}.Value()
     } else {
-        maxi := len(args)-1
-        for i:=0; i<maxi&&err==nil; i++ {
+        maxi := argnum - 1
+        for i:=0; i<maxi && err==nil; i++ {
             idisp = oleutil.MustGetProperty(idisp, args[i]).ToIDispatch()
             defer DoFuncs(idisp.Release)
         }
@@ -487,24 +495,24 @@ func GetProperty(idisp *ole.IDispatch, args... string) (ret interface{}, err err
 //put Property.
 func PutProperty(idisp *ole.IDispatch, args... interface{}) (err error) {
     defer Except("PutProperty", &err)
-    num := len(args)
-    if num==1 {
+    argnum := len(args)
+    if argnum==1 {
         oleutil.MustPutProperty(idisp, "Value", args[0])
-    } else if num>1 {
-        maxi := num-2
-        for i:=0; i<maxi&&err==nil; i++ {
+    } else if argnum>1 {
+        maxi := argnum-2
+        for i:=0; i<maxi && err==nil; i++ {
             idisp = oleutil.MustGetProperty(idisp, args[i].(string)).ToIDispatch()
             defer DoFuncs(idisp.Release)
         }
         //put multi-Property
-        if argv, ok := args[num-1].(map[string]interface{}); ok {
+        if argv, ok := args[argnum-1].(map[string]interface{}); ok {
             idisp = oleutil.MustGetProperty(idisp, args[maxi].(string)).ToIDispatch()
             defer DoFuncs(idisp.Release)
             for key, val := range argv {
                 oleutil.MustPutProperty(idisp, key, val)
             }
         } else {
-            oleutil.MustPutProperty(idisp, args[maxi].(string), args[num-1])
+            oleutil.MustPutProperty(idisp, args[maxi].(string), args[argnum-1])
         }
     } else {
         err = errors.New("args is empty")
@@ -527,6 +535,9 @@ func (va VARIANT) Value() (val interface{}) {
             val = *((*float32)(unsafe.Pointer(&va.Val)))
         case 5:
             val = *((*float64)(unsafe.Pointer(&va.Val)))
+        case ole.VT_CY:
+            _val6 := *((*int64)(unsafe.Pointer(&va.Val)))
+            val = float64(_val6)/10000
         case 7:               //VT_DATE. Unix(second):1970-1-1. excel(day):1900-1-1. 19 for leap year. 0.5 for round.
             _val7 := *((*float64)(unsafe.Pointer(&va.Val)))
             val = time.Unix(int64((_val7-70*365-19)*24*3600+0.5), 0).Format("2006-01-02 15:04:05")
@@ -539,6 +550,7 @@ func (va VARIANT) Value() (val interface{}) {
             val = "#VT_ERROR"
         case 11:
             val = *((*bool)(unsafe.Pointer(&va.Val)))
+        case 12:              //VT_VARIANT
         case 16:
             val = *((*int8)(unsafe.Pointer(&va.Val)))
         case 17:
@@ -551,6 +563,10 @@ func (va VARIANT) Value() (val interface{}) {
             val = *((*int64)(unsafe.Pointer(&va.Val)))
         case 21:
             val = *((*uint64)(unsafe.Pointer(&va.Val)))
+        //case ole.VT_ARRAY:
+            //
+        //case 0x200c:  //8204,range get, 0x2000(VT_ARRAY) + 0xC(VT_VARIANT)
+            //val = *((*uint64)(unsafe.Pointer(&va.Val)))
         default:
             val = va
     }
@@ -613,7 +629,7 @@ func Except(info string, err *error, funcs... interface{}) {
 
 //
 func DoFuncs(funcs... interface{}) {
-    if funcs != nil {
+    if len(funcs) != 0 {
         fx, args := reflect.Value{}, []reflect.Value{}
         for _, one := range funcs {
             cur := reflect.ValueOf(one)
@@ -642,7 +658,4 @@ func RftCall(function reflect.Value, args... reflect.Value) (err error) {
     function.Call(args)
     return
 }
-
-
-
 
