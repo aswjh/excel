@@ -492,6 +492,15 @@ func GetProperty(idisp *ole.IDispatch, args... string) (ret interface{}, err err
     return
 }
 
+//get Property as interface.
+func MustGetProperty(idisp *ole.IDispatch, args... string) (interface{}) {
+    ret, err := GetProperty(idisp, args...)
+    if err != nil {
+        panic(err.Error())
+    }
+    return ret
+}
+
 //put Property.
 func PutProperty(idisp *ole.IDispatch, args... interface{}) (err error) {
     defer Except("PutProperty", &err)
