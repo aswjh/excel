@@ -30,8 +30,8 @@ func main() {
 	sheet.Cells(1, 1, "hello")
 	sheet.PutCell(1, 2, 2006)
 	sheet.MustCells(1, 3, 3.14159)
-	_count, _ := excel.GetProperty(sheet.Idisp, "UsedRange", "Rows", "Count")
-	println("str:"+sheet.MustCells(1, 2), sheet.MustGetCell(1, 2).(float64), _count.(int32))
+	urc := sheet.MustGet("UsedRange", "Rows", "Count").(int32)
+	println("str:"+sheet.MustCells(1, 2), sheet.MustGetCell(1, 2).(float64), urc)
 
 	cell := sheet.MustCell(5, 6)
 	cell.Put("go")

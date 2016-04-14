@@ -420,39 +420,41 @@ func (sheet Sheet) PutRange(rang string, args... interface{}) (err error) {
     return
 }
 
+//get sheet Property
+func (sheet Sheet) Get(args... string) (ret interface{}, err error) {
+    ret, err = GetProperty(sheet.Idisp, args...)
+    return
+}
+
+//Must get sheet Property
+func (sheet Sheet) MustGet(args... string) (interface{}) {
+    return MustGetProperty(sheet.Idisp, args...)
+}
+
 //put range Property.
 func (ran Range) Put(args... interface{}) (error) {
     return PutProperty(ran.Idisp, args...)
 }
 
 //get range Property as interface.
-func (ran Range) Get(args... string) (ret interface{}, err error) {
-    defer Except("Range.Get", &err)
-    ret, err = GetProperty(ran.Idisp, args...)
-    return
+func (ran Range) Get(args... string) (interface{}, error) {
+    return GetProperty(ran.Idisp, args...)
 }
 
 //get Property as interface.
-func (cell Cell) Get(args... string) (ret interface{}, err error) {
-    defer Except("Cell.Get", &err)
-    ret, err = GetProperty(cell.Idisp, args...)
-    return
+func (cell Cell) Get(args... string) (interface{}, error) {
+    return GetProperty(cell.Idisp, args...)
 }
 
 //Must get Property as interface.
-func (cell Cell) MustGet(args... string) (ret interface{}) {
-    ret, err := cell.Get(args...)
-    if err != nil {
-        panic(err.Error())
-    }
-    return
+func (cell Cell) MustGet(args... string) (interface{}) {
+    return MustGetProperty(cell.Idisp, args...)
 }
 
 //get Property as string.
-func (cell Cell) Gets(args... string) (ret string, err error) {
-    defer Except("Cell.Gets", &err)
-    ret = String(cell.MustGet(args...))
-    return
+func (cell Cell) Gets(args... string) (string, error) {
+    v, err := cell.Get(args...)
+    return String(v), err
 }
 
 //Must get Property as string.
