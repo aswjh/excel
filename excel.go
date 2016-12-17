@@ -334,6 +334,11 @@ func (sheet Sheet) Delete() (err error) {
 }
 
 //
+func (sheet Sheet) Release() {
+    sheet.Idisp.Release()
+}
+
+//
 func (sheet Sheet) Name(args... string) (name string) {
     defer Except("", nil)
     if len(args) == 0 {
@@ -349,7 +354,7 @@ func (sheet Sheet) Name(args... string) (name string) {
 func (sheet Sheet) GetCell(r int, c int, args... string) (ret interface{} , err error) {
     defer Except("Sheet.GetCell", &err)
     cell := sheet.MustCell(r, c)
-    defer DoFuncs(cell.Idisp.Release)
+    defer DoFuncs(cell.Release)
     ret, err = cell.Get(args...)
     return
 }
@@ -367,7 +372,7 @@ func (sheet Sheet) MustGetCell(r int, c int, args... string) (ret interface{}) {
 func (sheet Sheet) PutCell(r int, c int, args... interface{}) (err error) {
     defer Except("Sheet.PutCell", &err)
     cell := sheet.MustCell(r, c)
-    defer DoFuncs(cell.Idisp.Release)
+    defer DoFuncs(cell.Release)
     err = cell.Put(args...)
     return
 }
@@ -414,9 +419,9 @@ func (sheet Sheet) Range(rang string) (Range) {
 //put range Property.
 func (sheet Sheet) PutRange(rang string, args... interface{}) (err error) {
     defer Except("Sheet.PutRange", &err)
-    ran := sheet.Range(rang)
-    defer DoFuncs(ran.Idisp.Release)
-    err = ran.Put(args...)
+    rg := sheet.Range(rang)
+    defer DoFuncs(rg.Release)
+    err = rg.Put(args...)
     return
 }
 
@@ -432,13 +437,18 @@ func (sheet Sheet) MustGet(args... string) (interface{}) {
 }
 
 //put range Property.
-func (ran Range) Put(args... interface{}) (error) {
-    return PutProperty(ran.Idisp, args...)
+func (rg Range) Put(args... interface{}) (error) {
+    return PutProperty(rg.Idisp, args...)
 }
 
 //get range Property as interface.
-func (ran Range) Get(args... string) (interface{}, error) {
-    return GetProperty(ran.Idisp, args...)
+func (rg Range) Get(args... string) (interface{}, error) {
+    return GetProperty(rg.Idisp, args...)
+}
+
+//
+func (rg Range) Release() {
+    rg.Idisp.Release()
 }
 
 //get Property as interface.
@@ -465,6 +475,11 @@ func (cell Cell) MustGets(args... string) (ret string) {
 //put cell Property.
 func (cell Cell) Put(args... interface{}) (error) {
     return PutProperty(cell.Idisp, args...)
+}
+
+//
+func (cell Cell) Release() {
+    cell.Idisp.Release()
 }
 
 //get Property as interface.

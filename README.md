@@ -37,9 +37,21 @@ func main() {
 	cell.Put("go")
 	cell.Put("font", map[string]interface{}{"name": "Arial", "size": 26, "bold": true})
 	cell.Put("interior", "colorindex", 6)
+	cell.Release()
 
 	sheet.PutRange("a3:c3", []string {"@1", "@2", "@3"})
-	sheet.Range("d3:f3").Put([]string {"~4", "~5", "~6"})
+	rg := sheet.Range("d3:f3")
+	rg.Put([]string {"~4", "~5", "~6"})
+	rg.Release()
+
+	cnt := 0
+	sheet.ReadRow("A", 2, "F", 9, func(row []interface{}) (rc int) {    //"A", 2 / 2, 9 / 2 / none
+		cnt ++
+		println(cnt, len(row))
+		return                                                                                   //-1: break
+	})
+
+	sheet.Release()
 
 	time.Sleep(3000000000)
 	xl.SaveAs("test_excel.xls")    //xl.SaveAs("test_excel", "html")
