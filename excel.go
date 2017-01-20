@@ -493,11 +493,13 @@ func (sheet Sheet) ReadRow(args... interface{}) {
         rg := sheet.Range(fmt.Sprintf("%v%v:%v%v", columnBegin, i, columnEnd, i))
         defer rg.Release()
 
-        row, r := []interface{} {}, rg.MustGet()
-        if v, ok := r.([]interface{}); ok {
-            row = v
+        row, v := []interface{} {}, rg.MustGet()
+        if rs, ok := v.([]interface{}); ok {
+            if len(rs) > 0 {
+                row = rs[0].([]interface{})
+            }
         } else {
-            row = append(row, r)
+            row = append(row, v)
         }
         if rc := proc(row); rc == -1 {
             break

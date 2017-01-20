@@ -45,7 +45,7 @@ func main() {
 	rg.Release()
 
 	cnt := 0
-	sheet.ReadRow("A", 1, "F", 9, func(row []interface{}) (rc int) {    //"A", 1  or  1, 9  or  1  or  nothing
+	sheet.ReadRow("A", 1, "F", 9, func(row []interface{}) (rc int) {    //"A", 1 or 1, 9 or 1 or nothing
 		cnt ++
 		println(cnt, excel.String(row))
 		return                                                                                   //-1: break
