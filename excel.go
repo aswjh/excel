@@ -1,6 +1,7 @@
 package excel
 
 import (
+    "syscall"
     "time"
     "strconv"
     "strings"
@@ -9,8 +10,15 @@ import (
     "reflect"
     "errors"
     "fmt"
+    "runtime/debug"
     "github.com/go-ole/go-ole"
     "github.com/go-ole/go-ole/oleutil"
+)
+
+var (
+    modoleaut32, _ = syscall.LoadDLL("oleaut32.dll")
+    procSafeArrayGetElement, _ = modoleaut32.FindProc("SafeArrayGetElement")
+    procSafeArrayGetVartype, _ = modoleaut32.FindProc("SafeArrayGetVartype")
 )
 
 type Option map[string]interface{}
@@ -436,6 +444,67 @@ func (sheet Sheet) MustGet(args... string) (interface{}) {
     return MustGetProperty(sheet.Idisp, args...)
 }
 
+//ReadRow("A", 1, "F", 9  or "A", 1  or  1, 9  or  1  or  nothing, procfunc)
+func (sheet Sheet) ReadRow(args... interface{}) {
+    columnBegin, columnEnd, rowBegin, rowEnd := "", "", 0, 0
+    proc := func([]interface{}) int {return 0}
+
+    for _, arg := range args {
+        switch arg.(type) {
+            case func([]interface{}) int:
+                proc = arg.(func([]interface{}) int)
+            case string:
+                if columnBegin == "" {
+                    columnBegin = arg.(string)
+                } else if columnEnd == "" {
+                    columnEnd = arg.(string)
+                }
+            case int:
+                if rowBegin <= 0 {
+                    rowBegin = arg.(int)
+                } else if rowEnd <= 0 {
+                    rowEnd = arg.(int)
+                }
+        }
+    }
+
+    if columnBegin == "" {
+        columnBegin = "A"
+    }
+    if columnEnd == "" {
+        if ucc, cb := int(sheet.MustGet("UsedRange", "Columns", "Count").(int32)), ColumnAtoi(columnBegin); ucc > cb {
+            columnEnd = ColumnItoa(ucc)
+        } else {
+            columnEnd = columnBegin
+        }
+    }
+    if rowBegin <= 0 {
+        rowBegin = 1
+    }
+    if rowEnd <= 0 {
+        if urc := int(sheet.MustGet("UsedRange", "Rows", "Count").(int32)); urc > rowBegin {
+            rowEnd = urc
+        } else {
+            rowEnd = rowBegin
+        }
+    }
+
+    for i := rowBegin; i <= rowEnd; i++ {
+        rg := sheet.Range(fmt.Sprintf("%v%v:%v%v", columnBegin, i, columnEnd, i))
+        defer rg.Release()
+
+        row, r := []interface{} {}, rg.MustGet()
+        if v, ok := r.([]interface{}); ok {
+            row = v
+        } else {
+            row = append(row, r)
+        }
+        if rc := proc(row); rc == -1 {
+            break
+        }
+    }
+}
+
 //put range Property.
 func (rg Range) Put(args... interface{}) (error) {
     return PutProperty(rg.Idisp, args...)
@@ -444,6 +513,11 @@ func (rg Range) Put(args... interface{}) (error) {
 //get range Property as interface.
 func (rg Range) Get(args... string) (interface{}, error) {
     return GetProperty(rg.Idisp, args...)
+}
+
+//
+func (rg Range) MustGet(args... string) (interface{}) {
+    return MustGetProperty(rg.Idisp, args...)
 }
 
 //
@@ -576,7 +650,7 @@ func (va VARIANT) Value() (val interface{}) {
             val = "#VT_ERROR"
         case 11:
             val = *((*bool)(unsafe.Pointer(&va.Val)))
-        case 12:              //VT_VARIANT
+        //case 12:              //VT_VARIANT
         case 16:
             val = *((*int8)(unsafe.Pointer(&va.Val)))
         case 17:
@@ -589,10 +663,9 @@ func (va VARIANT) Value() (val interface{}) {
             val = *((*int64)(unsafe.Pointer(&va.Val)))
         case 21:
             val = *((*uint64)(unsafe.Pointer(&va.Val)))
-        //case ole.VT_ARRAY:
-            //
-        //case 0x200c:  //8204,range get, 0x2000(VT_ARRAY) + 0xC(VT_VARIANT)
-            //val = *((*uint64)(unsafe.Pointer(&va.Val)))
+        case ole.VT_ARRAY, 0x200c:  //8204,range get, 0x2000(VT_ARRAY) + 0xC(VT_VARIANT)
+            val = ToValueArray(va.ToArray())
+            //val = va.ToArray().ToValueArray()
         default:
             val = va
     }
@@ -634,8 +707,29 @@ func String(val interface{}) (ret string) {
             }
         case string:
             ret = val.(string)
+        default:
+            ret = fmt.Sprintf("%+v", val)
     }
     return
+}
+
+//
+func ColumnItoa(num int) (col string) {
+    for num -= 1; num >= 0; num = num / 26 - 1 {
+        d := num % 26
+        col = string('A' + d) + col
+    }
+    return
+}
+
+//
+func ColumnAtoi(s string) int {
+    num, b, s := 0, 1, strings.ToUpper(s)
+    for i := len(s) - 1; i >= 0; i -- {
+        num += b * (int(s[i]) - 'A' + 1)
+        b = b * 26
+    }
+    return num
 }
 
 //
@@ -644,6 +738,7 @@ func Except(info string, err *error, funcs... interface{}) {
     if err != nil {
         if r != nil {
             *err = errors.New(fmt.Sprintf("@"+info+": %+v", r))
+            debug.PrintStack()
         } else if *err != nil {
             *err = errors.New("%"+info+"%"+(*err).Error())
         }
@@ -682,6 +777,56 @@ func RftCall(function reflect.Value, args... reflect.Value) (err error) {
         }
     }()
     function.Call(args)
+    return
+}
+
+//from github.com/go-ole/go-ole/utility.go:convertHresultToError
+// convertHresultToError converts syscall to error, if call is unsuccessful.
+func convertHresultToError(hr uintptr, r2 uintptr, ignore error) (err error) {
+    if hr != 0 {
+        err = ole.NewError(hr)
+    }
+    return
+}
+
+//from github.com/go-ole/go-ole/safearray_windows.go:safeArrayGetVartype
+// AKA: SafeArrayGetVartype in Windows API.
+func safeArrayGetVartype(safearray *ole.SafeArray) (varType uint16, err error) {
+    err = convertHresultToError(
+        procSafeArrayGetVartype.Call(
+            uintptr(unsafe.Pointer(safearray)),
+            uintptr(unsafe.Pointer(&varType))))
+    return
+}
+
+//from github.com/go-ole/go-ole/safearray_windows.go:safeArrayGetElement
+// safeArrayGetElement retrieves element at given index.
+func safeArrayGetElement(safearray *ole.SafeArray, index [2]int32, pv unsafe.Pointer) error {
+    indexPtr := unsafe.Pointer(&index[0])
+    return convertHresultToError(
+        procSafeArrayGetElement.Call(
+            uintptr(unsafe.Pointer(safearray)),
+            uintptr(indexPtr),
+            uintptr(pv)))
+}
+
+//from github.com/go-ole/go-ole/safearrayconversion.go:ToValueArray
+func ToValueArray(sac *ole.SafeArrayConversion) (values []interface{}) {
+    totalElements1, _ := sac.TotalElements(1)
+    totalElements2, _ := sac.TotalElements(2)
+    te1, te2 := int(totalElements1), int(totalElements2)
+
+    values = make([]interface{}, te1)
+    for i := 0; i < te1; i ++ {
+        row := make([]interface{}, te2)
+        for j := 0; j < te2; j ++ {
+            var v ole.VARIANT
+            safeArrayGetElement(sac.Array, [2]int32 {int32(i)+1, int32(j)+1}, unsafe.Pointer(&v))
+            row[j] = (VARIANT{&v}).Value()
+        }
+        values[i] = row
+    }
+
     return
 }
 
