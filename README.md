@@ -27,6 +27,7 @@ func main() {
 	defer xl.Quit()
 
 	sheet, _ := xl.Sheet(1)         //xl.Sheet("sheet1")
+	defer sheet.Release()
 	sheet.Cells(1, 1, "hello")
 	sheet.PutCell(1, 2, 2006)
 	sheet.MustCells(1, 3, 3.14159)
@@ -34,24 +35,22 @@ func main() {
 	println("str:"+sheet.MustCells(1, 2), sheet.MustGetCell(1, 2).(float64), urc)
 
 	cell := sheet.MustCell(5, 6)
+	defer cell.Release()
 	cell.Put("go")
 	cell.Put("font", map[string]interface{}{"name": "Arial", "size": 26, "bold": true})
 	cell.Put("interior", "colorindex", 6)
-	cell.Release()
 
 	sheet.PutRange("a3:c3", []string {"@1", "@2", "@3"})
 	rg := sheet.Range("d3:f3")
+	defer rg.Release()
 	rg.Put([]string {"~4", "~5", "~6"})
-	rg.Release()
 
 	cnt := 0
 	sheet.ReadRow("A", 1, "F", 9, func(row []interface{}) (rc int) {    //"A", 1 or 1, 9 or 1 or nothing
 		cnt ++
 		println(cnt, excel.String(row))
-		return                                                                                   //-1: break
+		return                                                                   //-1: break
 	})
-
-	sheet.Release()
 
 	time.Sleep(3000000000)
 	xl.SaveAs("test_excel.xls")    //xl.SaveAs("test_excel", "html")
