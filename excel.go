@@ -489,14 +489,14 @@ func (sheet Sheet) ReadRow(args... interface{}) {
         }
     }
 
-    for i := rowBegin; i <= rowEnd; i++ {
+    for i := rowBegin; i <= rowEnd; i ++ {
         rg := sheet.Range(fmt.Sprintf("%v%v:%v%v", columnBegin, i, columnEnd, i))
         defer rg.Release()
 
         row, v := []interface{} {}, rg.MustGet()
-        if rs, ok := v.([]interface{}); ok {
+        if rs, ok := v.([][]interface{}); ok {
             if len(rs) > 0 {
-                row = rs[0].([]interface{})
+                row = rs[0]
             }
         } else {
             row = append(row, v)
@@ -813,12 +813,12 @@ func safeArrayGetElement(safearray *ole.SafeArray, index [2]int32, pv unsafe.Poi
 }
 
 //from github.com/go-ole/go-ole/safearrayconversion.go:ToValueArray
-func ToValueArray(sac *ole.SafeArrayConversion) (values []interface{}) {
+func ToValueArray(sac *ole.SafeArrayConversion) (values [][]interface{}) {
     totalElements1, _ := sac.TotalElements(1)
     totalElements2, _ := sac.TotalElements(2)
     te1, te2 := int(totalElements1), int(totalElements2)
 
-    values = make([]interface{}, te1)
+    values = make([][]interface{}, te1)
     for i := 0; i < te1; i ++ {
         row := make([]interface{}, te2)
         for j := 0; j < te2; j ++ {
