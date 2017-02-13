@@ -17,6 +17,7 @@ go get github.com/aswjh/excel
 package main
 
 import (
+	"fmt"
 	"time"
 	"github.com/aswjh/excel"
 )
@@ -31,8 +32,6 @@ func main() {
 	sheet.Cells(1, 1, "hello")
 	sheet.PutCell(1, 2, 2006)
 	sheet.MustCells(1, 3, 3.14159)
-	urc := sheet.MustGet("UsedRange", "Rows", "Count").(int32)
-	println("str:"+sheet.MustCells(1, 2), sheet.MustGetCell(1, 2).(float64), urc)
 
 	cell := sheet.MustCell(5, 6)
 	defer cell.Release()
@@ -45,10 +44,13 @@ func main() {
 	defer rg.Release()
 	rg.Put([]string {"~4", "~5", "~6"})
 
+	urc := sheet.MustGet("UsedRange", "Rows", "Count").(int32)
+	println("str:"+sheet.MustCells(1, 2), sheet.MustGetCell(1, 2).(float64), cell.MustGet().(string), urc)
+
 	cnt := 0
 	sheet.ReadRow("A", 1, "F", 9, func(row []interface{}) (rc int) {    //"A", 1 or 1, 9 or 1 or nothing
 		cnt ++
-		println(cnt, excel.String(row))
+		fmt.Println(cnt, row)
 		return                                                                   //-1: break
 	})
 
