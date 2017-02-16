@@ -446,11 +446,15 @@ func (sheet Sheet) MustGet(args... string) (interface{}) {
 
 //ReadRow("A", 1, "F", 9  or "A", 1  or  1, 9  or  1  or  nothing, procfunc)
 func (sheet Sheet) ReadRow(args... interface{}) {
-    columnBegin, columnEnd, rowBegin, rowEnd := "", "", 0, 0
+    columnBegin, columnEnd, rowBegin, rowEnd, once := "", "", 0, 0, 20
     proc := func([]interface{}) int {return 0}
 
     for _, arg := range args {
         switch arg.(type) {
+            case int16:
+                if n := int(arg.(int16)); n > 0 {
+                    once = n
+                }
             case func([]interface{}) int:
                 proc = arg.(func([]interface{}) int)
             case string:
@@ -489,22 +493,25 @@ func (sheet Sheet) ReadRow(args... interface{}) {
         }
     }
 
-    for i := rowBegin; i <= rowEnd; i ++ {
-        rg := sheet.Range(fmt.Sprintf("%v%v:%v%v", columnBegin, i, columnEnd, i))
+    for rbi, rei := rowBegin, rowBegin - 1; rei < rowEnd; rbi = rei + 1 {
+        if rei += once; rei > rowEnd {
+            rei = rowEnd
+        }
+        rg := sheet.Range(fmt.Sprintf("%v%v:%v%v", columnBegin, rbi, columnEnd, rei))
         defer rg.Release()
 
-        row, v := []interface{} {}, rg.MustGet()
-        if rs, ok := v.([][]interface{}); ok {
-            if len(rs) > 0 {
-                row = rs[0]
+        val := rg.MustGet()
+        if v, ok := val.([][]interface{}); ok {
+            for _, row := range v {
+                if rc := proc(row); rc == -1 {
+                    goto END
+                }
             }
-        } else {
-            row = append(row, v)
-        }
-        if rc := proc(row); rc == -1 {
-            break
+        } else if rc := proc([]interface{} {val}); rc == -1 {
+            goto END
         }
     }
+END:
 }
 
 //put range Property.
