@@ -17,13 +17,15 @@ go get github.com/aswjh/excel
 package main
 
 import (
+	"runtime"
 	"fmt"
 	"time"
 	"github.com/aswjh/excel"
 )
 
 func main() {
-	option := excel.Option{"Visible": true, "DisplayAlerts": true}
+	runtime.GOMAXPROCS(1)
+	option := excel.Option{"Visible": true, "DisplayAlerts": true, "ScreenUpdating": true}
 	xl, _ := excel.New(option)      //xl, _ := excel.Open("test_excel.xls", option)
 	defer xl.Quit()
 
