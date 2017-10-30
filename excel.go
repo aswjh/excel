@@ -1,6 +1,7 @@
 package excel
 
 import (
+    "os"
     "syscall"
     "time"
     "strconv"
@@ -104,9 +105,7 @@ func (mso *MSO) SaveAs(args... interface{}) ([]error) {
 func (mso *MSO) Quit() (err error) {
     defer Except("Quit", &err, ole.CoUninitialize)
     if r := recover(); r != nil {   //catch panic of which defering Quit.
-        info := fmt.Sprintf("***panic before Quit: %+v", r)
-        fmt.Println(info)
-        err = errors.New(info)
+        err = errors.New(fmt.Sprintf("***panic before Quit: %+v", r))
     }
     oleutil.MustCallMethod(mso.IdWorkBooks, "Close")
     oleutil.MustCallMethod(mso.IdExcel, "Quit")
@@ -745,8 +744,13 @@ func ColumnAtoi(s string) int {
 func Except(info string, err *error, funcs... interface{}) {
     r := recover()
     if err != nil {
+        if *err != nil {
+            fmt.Fprintf(os.Stderr, "*%v: %+v\n", info, *err)
+        }
         if r != nil {
-            *err = errors.New(fmt.Sprintf("@"+info+": %+v", r))
+            e := fmt.Sprintf("@%v: %+v", info, r)
+            fmt.Fprintf(os.Stderr, "%v\n", e)
+            *err = errors.New(e)
             debug.PrintStack()
         } else if *err != nil {
             *err = errors.New("%"+info+"%"+(*err).Error())
