@@ -367,12 +367,12 @@ func (sheet Sheet) GetCell(r int, c int, args... string) (ret interface{} , err 
 }
 
 //Must get cell Property as interface.
-func (sheet Sheet) MustGetCell(r int, c int, args... string) (ret interface{}) {
+func (sheet Sheet) MustGetCell(r int, c int, args... string) (interface{}) {
     ret, err := sheet.GetCell(r, c, args...)
     if err != nil {
-        panic(err.Error())
+        panic(err)
     }
-    return
+    return ret
 }
 
 //put cell Property.
@@ -399,7 +399,7 @@ func (sheet Sheet) Cells(r int, c int, vals... interface{}) (ret string, err err
 func (sheet Sheet) MustCells(r int, c int, vals... interface{}) (ret string) {
     ret, err := sheet.Cells(r, c, vals...)
     if err != nil {
-        panic(err.Error())
+        panic(err)
     }
     return
 }
@@ -421,6 +421,23 @@ func (sheet Sheet) MustCell(r int, c int) (cell Cell) {
 //get range pointer.
 func (sheet Sheet) Range(rang string) (Range) {
     return Range{oleutil.MustGetProperty(sheet.Idisp, "Range", rang).ToIDispatch()}
+}
+
+//get range Property as interface.
+func (sheet Sheet) GetRange(rang string) (ret interface{} , err error) {
+    defer Except("Sheet.GetRange", &err)
+    rg := sheet.Range(rang)
+    defer DoFuncs(rg.Release)
+    ret, err = rg.Get()
+    return
+}
+
+func (sheet Sheet) MustGetRange(rang string) (interface{}) {
+    ret, err := sheet.GetRange(rang)
+    if err != nil {
+        panic(err)
+    }
+    return ret
 }
 
 //put range Property.
@@ -496,10 +513,7 @@ func (sheet Sheet) ReadRow(args... interface{}) {
         if rei += once; rei > rowEnd {
             rei = rowEnd
         }
-        rg := sheet.Range(fmt.Sprintf("%v%v:%v%v", columnBegin, rbi, columnEnd, rei))
-        defer rg.Release()
-
-        val := rg.MustGet()
+        val := sheet.MustGetRange(fmt.Sprintf("%v%v:%v%v", columnBegin, rbi, columnEnd, rei))
         if v, ok := val.([][]interface{}); ok {
             for _, row := range v {
                 if rc := proc(row); rc == -1 {
@@ -595,7 +609,7 @@ func GetProperty(idisp *ole.IDispatch, args... string) (ret interface{}, err err
 func MustGetProperty(idisp *ole.IDispatch, args... string) (interface{}) {
     ret, err := GetProperty(idisp, args...)
     if err != nil {
-        panic(err.Error())
+        panic(err)
     }
     return ret
 }
