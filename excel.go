@@ -463,7 +463,7 @@ func (sheet Sheet) MustGet(args... string) (interface{}) {
 //ReadRow("A", 1, "F", 9  or "A", 1  or  1, 9  or  1  or  nothing, procfunc)
 func (sheet Sheet) ReadRow(args... interface{}) {
     columnBegin, columnEnd, rowBegin, rowEnd, once := "", "", 0, 0, 20
-    proc := func([]interface{}) int {return 0}
+    var proc func([]interface{}) int
 
     for _, arg := range args {
         switch arg.(type) {
@@ -486,6 +486,9 @@ func (sheet Sheet) ReadRow(args... interface{}) {
                     rowEnd = arg.(int)
                 }
         }
+    }
+    if proc == nil {
+        panic("ReadRow proc is nil, want func([]interface{}) int")
     }
 
     if columnBegin == "" {
