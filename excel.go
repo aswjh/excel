@@ -29,6 +29,7 @@ type MSO struct {
     IuApp                      *ole.IUnknown
     IdExcel                    *ole.IDispatch
     IdWorkBooks                *ole.IDispatch
+    WorkBook WorkBook
     Version                   float64
     FILEFORMAT          map[string]int
 }
@@ -79,7 +80,7 @@ func Initialize(opt... Option) (mso *MSO) {
 func New(opt... Option) (mso *MSO, err error){
     defer Except("New", &err)
     mso = Initialize(opt...)
-    _, err = mso.AddWorkBook()
+    mso.WorkBook, err = mso.AddWorkBook()
     return
 }
 
@@ -87,7 +88,7 @@ func New(opt... Option) (mso *MSO, err error){
 func Open(full string, opt... Option) (mso *MSO, err error) {
     defer Except("Open", &err)
     mso = Initialize(opt...)
-    _, err = mso.OpenWorkBook(full)
+    mso.WorkBook, err = mso.OpenWorkBook(full)
     return
 }
 
