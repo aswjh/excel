@@ -567,6 +567,30 @@ func (cell Cell) Put(args... interface{}) (error) {
     return PutProperty(cell.IDispatch, args...)
 }
 
+//
+func GetIDispatch(_idisp interface{}, args... string) (idisp *ole.IDispatch) {
+    switch _idisp.(type) {
+        case *ole.IDispatch:
+            idisp = _idisp.(*ole.IDispatch)
+        case Cell:
+            idisp = _idisp.(Cell).IDispatch
+        case Range:
+            idisp = _idisp.(Range).IDispatch
+        case Sheet:
+            idisp = _idisp.(Sheet).IDispatch
+        case WorkBook:
+            idisp = _idisp.(WorkBook).IDispatch
+    }
+    for i, name := range args {
+        prev := idisp
+        idisp = oleutil.MustGetProperty(idisp, name).ToIDispatch()
+        if i != 0 {
+            prev.Release()
+        }
+    }
+    return
+}
+
 //get Property as interface.
 func GetProperty(idisp *ole.IDispatch, args... string) (ret interface{}, err error) {
     defer Except("GetProperty", &err)
