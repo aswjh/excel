@@ -154,7 +154,7 @@ func (mso *MSO) Pick(workx string, id interface{}) (ret *ole.IDispatch, err erro
     } else if id_str, ok := id.(string); ok {
         ret = oleutil.MustGetProperty(mso.IdExcel, workx, id_str).ToIDispatch()
     } else {
-        err = errors.New("sheet id incorrect")
+        err = errors.New("incorrect sheet id")
     }
     return
 }
@@ -356,7 +356,7 @@ func (sheet Sheet) Name(args... string) (name string) {
 //get cell Property as interface.
 func (sheet Sheet) GetCell(r int, c int, args... string) (ret interface{} , err error) {
     defer Except("Sheet.GetCell", &err)
-    cell := sheet.MustCell(r, c)
+    cell := sheet.Cell(r, c)
     defer DoFuncs(cell.Release)
     ret, err = cell.Get(args...)
     return
@@ -374,7 +374,7 @@ func (sheet Sheet) MustGetCell(r int, c int, args... string) (interface{}) {
 //put cell Property.
 func (sheet Sheet) PutCell(r int, c int, args... interface{}) (err error) {
     defer Except("Sheet.PutCell", &err)
-    cell := sheet.MustCell(r, c)
+    cell := sheet.Cell(r, c)
     defer DoFuncs(cell.Release)
     err = cell.Put(args...)
     return
@@ -401,17 +401,8 @@ func (sheet Sheet) MustCells(r int, c int, vals... interface{}) (ret string) {
 }
 
 //get cell pointer.
-func (sheet Sheet) Cell(r int, c int) (cell Cell, err error) {
-    defer Except("Sheet.Cell", &err)
-    _cell, err := sheet.GetProperty("Cells", r, c)
-    cell = Cell{_cell.ToIDispatch()}
-    return
-}
-
-//Must get cell pointer.
-func (sheet Sheet) MustCell(r int, c int) (cell Cell) {
-    cell = Cell{oleutil.MustGetProperty(sheet.IDispatch, "Cells", r, c).ToIDispatch()}
-    return
+func (sheet Sheet) Cell(r int, c int) (Cell) {
+    return Cell{oleutil.MustGetProperty(sheet.IDispatch, "Cells", r, c).ToIDispatch()}
 }
 
 //get range pointer.
