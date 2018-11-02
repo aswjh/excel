@@ -559,6 +559,13 @@ func (cell Cell) Put(args... interface{}) (error) {
 }
 
 //
+func Release(idisps... *ole.IDispatch) {
+    for _, idisp := range idisps {
+        idisp.Release()
+    }
+}
+
+//
 func GetIDispatch(_idisp interface{}, args... string) (idisp *ole.IDispatch) {
     switch _idisp.(type) {
         case *ole.IDispatch:

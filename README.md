@@ -35,7 +35,7 @@ func main() {
 	sheet.PutCell(1, 2, 2006)
 	sheet.MustCells(1, 3, 3.14159)
 
-	cell := sheet.MustCell(5, 6)
+	cell := sheet.Cell(5, 6)
 	defer cell.Release()
 	cell.Put("go")
 	cell.Put("font", map[string]interface{}{"name": "Arial", "size": 26, "bold": true})
@@ -55,6 +55,19 @@ func main() {
 		fmt.Println(cnt, row)
 		return                                                                   //-1: break
 	})
+
+	time.Sleep(2000000000)
+	cells := excel.GetIDispatch(sheet, "Cells")
+	cells.CallMethod("UnMerge")
+	sort := excel.GetIDispatch(sheet, "Sort")
+	sortfields := excel.GetIDispatch(sort, "SortFields")
+	sortfields.CallMethod("Clear")
+	sortfields.CallMethod("Add", sheet.Range("f:f").IDispatch, 0, 2)
+	sort.CallMethod("SetRange", cells)
+	sort.CallMethod("Apply")
+
+	cells.CallMethod("AutoFilter")
+	excel.Release(sortfields, sort, cells)
 
 	time.Sleep(3000000000)
 	xl.SaveAs("test_excel.xls")    //xl.SaveAs("test_excel", "html")
