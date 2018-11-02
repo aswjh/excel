@@ -225,16 +225,8 @@ func (mso *MSO) Sheet(id interface {}) (Sheet, error) {
 }
 
 //
-func (mso *MSO) AddSheet(wb *ole.IDispatch, args... string) (Sheet, error) {
-    sheets := oleutil.MustGetProperty(wb, "Sheets").ToIDispatch()
-    defer sheets.Release()
-    _sheet, err := sheets.CallMethod("Add")
-    sheet := Sheet{_sheet.ToIDispatch()}
-    if args != nil {
-        sheet.Name(args...)
-    }
-    sheet.Select()
-    return sheet, err
+func (mso *MSO) AddSheet(args... string) (Sheet, error) {
+    return mso.WorkBook.AddSheet(args...)
 }
 
 //
@@ -296,6 +288,19 @@ func (wb WorkBook) Save() (err error) {
     defer Except("WorkBook.Save", &err)
     _, err = wb.CallMethod("Save")
     return
+}
+
+//
+func (wb WorkBook) AddSheet(args... string) (Sheet, error) {
+    sheets := GetIDispatch(wb.IDispatch, "Sheets")
+    defer sheets.Release()
+    _sheet, err := sheets.CallMethod("Add")
+    sheet := Sheet{_sheet.ToIDispatch()}
+    if len(args) > 0 {
+        sheet.Name(args[0])
+    }
+    sheet.Select()
+    return sheet, err
 }
 
 //
