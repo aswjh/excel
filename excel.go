@@ -35,22 +35,22 @@ type MSO struct {
 }
 
 type WorkBook struct {
-    Idisp *ole.IDispatch
+    *ole.IDispatch
     *MSO
 }
 
 type WorkBooks []WorkBook
 
 type Sheet struct {
-    Idisp *ole.IDispatch
+    *ole.IDispatch
 }
 
 type Range struct {
-    Idisp *ole.IDispatch
+    *ole.IDispatch
 }
 
 type Cell struct {
-    Idisp *ole.IDispatch
+    *ole.IDispatch
 }
 
 type VARIANT struct {
@@ -175,14 +175,14 @@ func (mso *MSO) WorkBooks() (wbs WorkBooks) {
 
 //
 func (mso *MSO) AddWorkBook() (WorkBook, error) {
-    _wb , err := oleutil.CallMethod(mso.IdWorkBooks, "Add")
+    _wb , err := mso.IdWorkBooks.CallMethod("Add")
     defer Except("AddWorkBook", &err)
     return WorkBook{_wb.ToIDispatch(), mso}, err
 }
 
 //
 func (mso *MSO) OpenWorkBook(full string) (WorkBook, error) {
-    _wb, err := oleutil.CallMethod(mso.IdWorkBooks, "open", full)
+    _wb, err := mso.IdWorkBooks.CallMethod("open", full)
     defer Except("OpenWorkBook", &err)
     return WorkBook{_wb.ToIDispatch(), mso}, err
 }
@@ -228,7 +228,7 @@ func (mso *MSO) Sheet(id interface {}) (Sheet, error) {
 func (mso *MSO) AddSheet(wb *ole.IDispatch, args... string) (Sheet, error) {
     sheets := oleutil.MustGetProperty(wb, "Sheets").ToIDispatch()
     defer sheets.Release()
-    _sheet, err := oleutil.CallMethod(sheets, "Add")
+    _sheet, err := sheets.CallMethod("Add")
     sheet := Sheet{_sheet.ToIDispatch()}
     if args != nil {
         sheet.Name(args...)
@@ -281,20 +281,20 @@ func (wbs WorkBooks) Close() (errs []error) {
 //
 func (wb WorkBook) Activate() (err error) {
     defer Except("WorkBook.Activate", &err)
-    _, err = oleutil.CallMethod(wb.Idisp, "Activate")
+    _, err = wb.CallMethod("Activate")
     return
 }
 
 //
 func (wb WorkBook) Name() (string) {
     defer Except("", nil)
-    return oleutil.MustGetProperty(wb.Idisp, "Name").ToString()
+    return oleutil.MustGetProperty(wb.IDispatch, "Name").ToString()
 }
 
 //
 func (wb WorkBook) Save() (err error) {
     defer Except("WorkBook.Save", &err)
-    _, err = oleutil.CallMethod(wb.Idisp, "Save")
+    _, err = wb.CallMethod("Save")
     return
 }
 
@@ -316,44 +316,39 @@ func (wb WorkBook) SaveAs(args... interface{}) (err error) {
                 }
         }
     }
-    _, err = oleutil.CallMethod(wb.Idisp, "SaveAs", args...)
+    _, err = wb.CallMethod("SaveAs", args...)
     return
 }
 
 //
 func (wb WorkBook) Close() (err error) {
     defer Except("WorkBook.Close", &err)
-    _, err = oleutil.CallMethod(wb.Idisp, "Close")
+    _, err = wb.CallMethod("Close")
     return
 }
 
 //
 func (sheet Sheet) Select() (err error) {
     defer Except("Sheet.Select", &err)
-    _, err = oleutil.CallMethod(sheet.Idisp, "Select")
+    _, err = sheet.CallMethod("Select")
     return
 }
 
 //
 func (sheet Sheet) Delete() (err error) {
     defer Except("Sheet.Delete", &err)
-    _, err = oleutil.CallMethod(sheet.Idisp, "Delete")
+    _, err = sheet.CallMethod("Delete")
     return
-}
-
-//
-func (sheet Sheet) Release() {
-    sheet.Idisp.Release()
 }
 
 //
 func (sheet Sheet) Name(args... string) (name string) {
     defer Except("", nil)
     if len(args) == 0 {
-        name = oleutil.MustGetProperty(sheet.Idisp, "Name").ToString()
+        name = oleutil.MustGetProperty(sheet.IDispatch, "Name").ToString()
     } else {
         name = args[0]
-        oleutil.MustPutProperty(sheet.Idisp, "Name", name)
+        oleutil.MustPutProperty(sheet.IDispatch, "Name", name)
     }
     return
 }
@@ -408,20 +403,20 @@ func (sheet Sheet) MustCells(r int, c int, vals... interface{}) (ret string) {
 //get cell pointer.
 func (sheet Sheet) Cell(r int, c int) (cell Cell, err error) {
     defer Except("Sheet.Cell", &err)
-    _cell, err := oleutil.GetProperty(sheet.Idisp, "Cells", r, c)
+    _cell, err := sheet.GetProperty("Cells", r, c)
     cell = Cell{_cell.ToIDispatch()}
     return
 }
 
 //Must get cell pointer.
 func (sheet Sheet) MustCell(r int, c int) (cell Cell) {
-    cell = Cell{oleutil.MustGetProperty(sheet.Idisp, "Cells", r, c).ToIDispatch()}
+    cell = Cell{oleutil.MustGetProperty(sheet.IDispatch, "Cells", r, c).ToIDispatch()}
     return
 }
 
 //get range pointer.
 func (sheet Sheet) Range(rang string) (Range) {
-    return Range{oleutil.MustGetProperty(sheet.Idisp, "Range", rang).ToIDispatch()}
+    return Range{oleutil.MustGetProperty(sheet.IDispatch, "Range", rang).ToIDispatch()}
 }
 
 //get range Property as interface.
@@ -452,13 +447,13 @@ func (sheet Sheet) PutRange(rang string, args... interface{}) (err error) {
 
 //get sheet Property
 func (sheet Sheet) Get(args... string) (ret interface{}, err error) {
-    ret, err = GetProperty(sheet.Idisp, args...)
+    ret, err = GetProperty(sheet.IDispatch, args...)
     return
 }
 
 //Must get sheet Property
 func (sheet Sheet) MustGet(args... string) (interface{}) {
-    return MustGetProperty(sheet.Idisp, args...)
+    return MustGetProperty(sheet.IDispatch, args...)
 }
 
 //ReadRow("A", 1, "F", 9  or "A", 1  or  1, 9  or  1  or  nothing, procfunc)
@@ -533,32 +528,27 @@ END:
 
 //put range Property.
 func (rg Range) Put(args... interface{}) (error) {
-    return PutProperty(rg.Idisp, args...)
+    return PutProperty(rg.IDispatch, args...)
 }
 
 //get range Property as interface.
 func (rg Range) Get(args... string) (interface{}, error) {
-    return GetProperty(rg.Idisp, args...)
+    return GetProperty(rg.IDispatch, args...)
 }
 
 //
 func (rg Range) MustGet(args... string) (interface{}) {
-    return MustGetProperty(rg.Idisp, args...)
-}
-
-//
-func (rg Range) Release() {
-    rg.Idisp.Release()
+    return MustGetProperty(rg.IDispatch, args...)
 }
 
 //get Property as interface.
 func (cell Cell) Get(args... string) (interface{}, error) {
-    return GetProperty(cell.Idisp, args...)
+    return GetProperty(cell.IDispatch, args...)
 }
 
 //Must get Property as interface.
 func (cell Cell) MustGet(args... string) (interface{}) {
-    return MustGetProperty(cell.Idisp, args...)
+    return MustGetProperty(cell.IDispatch, args...)
 }
 
 //get Property as string.
@@ -574,12 +564,7 @@ func (cell Cell) MustGets(args... string) (ret string) {
 
 //put cell Property.
 func (cell Cell) Put(args... interface{}) (error) {
-    return PutProperty(cell.Idisp, args...)
-}
-
-//
-func (cell Cell) Release() {
-    cell.Idisp.Release()
+    return PutProperty(cell.IDispatch, args...)
 }
 
 //get Property as interface.
