@@ -64,6 +64,7 @@ func main() {
 	sortfields.CallMethod("Clear")
 	sortfields.CallMethod("Add", sheet.Range("f:f").IDispatch, 0, 2)
 	sort.CallMethod("SetRange", cells)
+	sort.PutProperty("Header", 1)
 	sort.CallMethod("Apply")
 
 	cells.CallMethod("AutoFilter")
