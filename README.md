@@ -67,8 +67,13 @@ func main() {
 	sort.PutProperty("Header", 1)
 	sort.CallMethod("Apply")
 
+	shapes := excel.GetIDispatch(sheet, "Shapes")
+	_chart, _ := shapes.CallMethod("AddChart", 65)
+	chart := _chart.ToIDispatch()
+	chart.CallMethod("SetSourceData", sheet.Range("a1:c3").IDispatch)
+
 	cells.CallMethod("AutoFilter")
-	excel.Release(sortfields, sort, cells)
+	excel.Release(sortfields, sort, cells, chart, shapes)
 
 	time.Sleep(3000000000)
 	xl.SaveAs("test_excel.xls")    //xl.SaveAs("test_excel", "html")
