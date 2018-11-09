@@ -454,7 +454,8 @@ func (sheet Sheet) MustGet(args... string) (interface{}) {
 
 //ReadRow("A", 1, "F", 9  or "A", 1  or  1, 9  or  1  or  nothing, procfunc)
 func (sheet Sheet) ReadRow(args... interface{}) {
-    columnBegin, columnEnd, rowBegin, rowEnd, once := "", "", 0, 0, 20
+    ucc := int(sheet.MustGet("UsedRange", "Columns", "Count").(int32))
+    columnBegin, columnEnd, rowBegin, rowEnd, once := "", "", 0, 0, 1000/(10+ucc)+1
     var proc func([]interface{}) int
 
     for _, arg := range args {
@@ -487,7 +488,7 @@ func (sheet Sheet) ReadRow(args... interface{}) {
         columnBegin = "A"
     }
     if columnEnd == "" {
-        if ucc, cb := int(sheet.MustGet("UsedRange", "Columns", "Count").(int32)), ColumnAtoi(columnBegin); ucc > cb {
+        if cb := ColumnAtoi(columnBegin); ucc > cb {
             columnEnd = ColumnItoa(ucc)
         } else {
             columnEnd = columnBegin
