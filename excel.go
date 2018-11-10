@@ -703,8 +703,10 @@ func (va VARIANT) Value() (val interface{}) {
         case 21:
             val = *((*uint64)(unsafe.Pointer(&va.Val)))
         case ole.VT_ARRAY, 0x200c:  //8204,range get, 0x2000(VT_ARRAY) + 0xC(VT_VARIANT)
-            val = ToValueArray(va.ToArray())
-            //val = va.ToArray().ToValueArray()
+            sac := va.ToArray()
+            val = ToValueArray(sac)
+            //val = sac.ToValueArray()
+            sac.Release()
         default:
             val = va
     }
