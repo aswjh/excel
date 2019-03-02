@@ -57,6 +57,8 @@ func main() {
 	})
 
 	time.Sleep(2000000000)
+
+	//Sort
 	cells := excel.GetIDispatch(sheet, "Cells")
 	cells.CallMethod("UnMerge")
 	sort := excel.GetIDispatch(sheet, "Sort")
@@ -67,11 +69,13 @@ func main() {
 	sort.PutProperty("Header", 1)
 	sort.CallMethod("Apply")
 
+	//Chart
 	shapes := excel.GetIDispatch(sheet, "Shapes")
 	_chart, _ := shapes.CallMethod("AddChart", 65)
 	chart := _chart.ToIDispatch()
 	chart.CallMethod("SetSourceData", sheet.Range("a1:c3").IDispatch)
 
+	//AutoFilter
 	cells.CallMethod("AutoFilter")
 	excel.Release(sortfields, sort, cells, chart, shapes)
 
